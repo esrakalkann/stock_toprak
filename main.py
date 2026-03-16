@@ -4,7 +4,7 @@ import threading
 import logging
 from datetime import datetime
 
-from flask import Flask, request, jsonify, abort
+from flask import Flask, request, jsonify, abort, send_file
 from flask_cors import CORS
 
 # ── Logging ayarı ──────────────────────────────────────────────────────────────
@@ -330,6 +330,9 @@ def get_status():
 def health():
     return jsonify({"status": "ok"}), 200
 
+@app.route('/dashboard', methods=['GET'])
+def dashboard():
+    return send_file('dashboard.html')
 
 # ── Uygulama başlatma ──────────────────────────────────────────────────────────
 
