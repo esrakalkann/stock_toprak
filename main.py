@@ -81,6 +81,22 @@ def set_leverage(client, symbol, leverage):
     except Exception as e:
         log.warning(f"Kaldıraç ayar hatası ({symbol}): {e}")
 
+def get_qty_step(client, symbol):
+    try:
+        resp = client.get_instruments_info(category="linear", symbol=symbol)
+        lot_filter = resp["result"]["list"][0]["lotSizeFilter"]
+        step = float(lot_filter["qtyStep"])
+        min_qty = float(lot_filter["minOrderQty"])
+        return step, min_qty
+    except Exception as e:
+        log.warning(f"Lot size alınamadı ({symbol}): {e}")
+        return 0.001, 0.001
+
+def round_qty(qty, step):
+    import math
+    decimals = len(str(step).rstrip('0').split('.')[-1]) if '.' in str(step) else 0
+    qty = math.floor(qty / step) * step
+    return round(qty, decimals)
 
 def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_pct):
     """
@@ -91,7 +107,10 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     tp_pct  = take profit yüzdesi
     """
     side = "Buy" if direction == "Long" else "Sell"
-    qty  = round(amount / price, 6)  # coin miktarı
+    step, min_qty = get_qty_step(client, symbol)
+    qty = round_qty(amount / price, step)
+    if qty < min_qty:
+        qty = min_qty
 
     # SL ve TP fiyatları
     if direction == "Long":
