@@ -1,248 +1,422 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>tradebot dashboard</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
-.dash { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
-
-.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
-.header-left { display: flex; align-items: center; gap: 10px; }
-.logo { font-size: 16px; font-weight: 500; letter-spacing: -0.3px; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #3a9e6e; animation: pulse 2s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-.last-update { font-size: 12px; color: #888; }
-.refresh-btn { font-size: 12px; color: #555; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 6px 14px; cursor: pointer; }
-.refresh-btn:hover { background: #f0f0f0; }
-
-.metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
-.metric { background: #fff; border-radius: 10px; padding: 16px 18px; border: 1px solid #e8e8e8; }
-.metric-label { font-size: 12px; color: #888; margin-bottom: 6px; }
-.metric-value { font-size: 24px; font-weight: 500; }
-.metric-value.long { color: #2d8f5e; }
-.metric-value.short { color: #c04b3a; }
-.metric-value.neutral { color: #1a1a1a; }
-.metric-sub { font-size: 11px; color: #aaa; margin-top: 3px; }
-
-.info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 1.5rem; }
-.info-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 10px; padding: 14px 18px; }
-.info-card-label { font-size: 12px; color: #888; margin-bottom: 6px; }
-.badge { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 6px; font-weight: 500; }
-.badge.long { background: #e6f4ec; color: #1a6e3f; }
-.badge.short { background: #faeaea; color: #9b2e2e; }
-.badge.neutral { background: #f0f0f0; color: #555; }
-
-.conn-bar { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #e8e8e8; border-radius: 10px; padding: 10px 16px; margin-bottom: 1.5rem; font-size: 13px; color: #888; }
-.conn-ok { color: #2d8f5e; font-weight: 500; }
-.conn-err { color: #c04b3a; font-weight: 500; }
-.conn-url { margin-left: auto; font-size: 12px; color: #aaa; }
-
-.section-title { font-size: 12px; font-weight: 500; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-.table-wrap { background: #fff; border: 1px solid #e8e8e8; border-radius: 10px; overflow: hidden; margin-bottom: 1.5rem; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-thead tr { border-bottom: 1px solid #f0f0f0; }
-thead th { padding: 10px 14px; text-align: left; color: #888; font-weight: 500; font-size: 12px; }
-tbody tr { border-bottom: 1px solid #f0f0f0; }
-tbody tr:last-child { border-bottom: none; }
-tbody tr:hover { background: #fafafa; }
-tbody td { padding: 9px 14px; color: #1a1a1a; }
-.dir-long { color: #2d8f5e; font-weight: 500; }
-.dir-short { color: #c04b3a; font-weight: 500; }
-.dir-none { color: #ccc; }
-
-.history-list { background: #fff; border: 1px solid #e8e8e8; border-radius: 10px; overflow: hidden; }
-.history-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
-.history-item:last-child { border-bottom: none; }
-.history-signal { display: flex; align-items: center; gap: 8px; }
-.history-time { color: #aaa; font-size: 12px; }
-.empty { color: #bbb; font-size: 13px; text-align: center; padding: 2rem; }
-
-@media (max-width: 700px) {
-  .metric-grid { grid-template-columns: repeat(2, 1fr); }
-  .info-grid { grid-template-columns: repeat(1, 1fr); }
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tradebot dashboard</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f3;
+            color: #1a1a1a;
+            min-height: 100vh;
+        }
+        
+        .dash {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logo {
+            font-size: 16px;
+            font-weight: 500;
+            letter-spacing: -0.3px;
+        }
+        
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #3a9e6e;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 1
+            }
+            50% {
+                opacity: 0.4
+            }
+        }
+        
+        .last-update {
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .refresh-btn {
+            font-size: 12px;
+            color: #555;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 6px 14px;
+            cursor: pointer;
+        }
+        
+        .refresh-btn:hover {
+            background: #f0f0f0;
+        }
+        
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .metric {
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px 18px;
+            border: 1px solid #e8e8e8;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: 500;
+        }
+        
+        .metric-value.long {
+            color: #2d8f5e;
+        }
+        
+        .metric-value.short {
+            color: #c04b3a;
+        }
+        
+        .metric-value.neutral {
+            color: #1a1a1a;
+        }
+        
+        .metric-sub {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 3px;
+        }
+        
+        .conn-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #fff;
+            border: 1px solid #e8e8e8;
+            border-radius: 10px;
+            padding: 10px 16px;
+            margin-bottom: 1.5rem;
+            font-size: 13px;
+            color: #888;
+        }
+        
+        .conn-ok {
+            color: #2d8f5e;
+            font-weight: 500;
+        }
+        
+        .conn-err {
+            color: #c04b3a;
+            font-weight: 500;
+        }
+        
+        .conn-url {
+            margin-left: auto;
+            font-size: 12px;
+            color: #aaa;
+        }
+        
+        .section-title {
+            font-size: 12px;
+            font-weight: 500;
+            color: #888;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .table-wrap {
+            background: #fff;
+            border: 1px solid #e8e8e8;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        thead tr {
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        thead th {
+            padding: 10px 14px;
+            text-align: left;
+            color: #888;
+            font-weight: 500;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        
+        tbody tr {
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        tbody tr:last-child {
+            border-bottom: none;
+        }
+        
+        tbody tr:hover {
+            background: #fafafa;
+        }
+        
+        tbody td {
+            padding: 9px 14px;
+            color: #1a1a1a;
+            white-space: nowrap;
+        }
+        
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        
+        .badge.long {
+            background: #e6f4ec;
+            color: #1a6e3f;
+        }
+        
+        .badge.short {
+            background: #faeaea;
+            color: #9b2e2e;
+        }
+        
+        .empty {
+            color: #bbb;
+            font-size: 13px;
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        @media (max-width: 700px) {
+            .metric-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
 </head>
+
 <body>
-<div class="dash">
-  <div class="header">
-    <div class="header-left">
-      <div class="dot" id="live-dot"></div>
-      <span class="logo">tradebot</span>
-      <span class="last-update" id="last-update">yükleniyor...</span>
-    </div>
-    <button class="refresh-btn" onclick="fetchData()">yenile</button>
-  </div>
+    <div class="dash">
+        <div class="header">
+            <div class="header-left">
+                <div class="dot" id="live-dot"></div>
+                <span class="logo">tradebot</span>
+                <span class="last-update" id="last-update">yükleniyor...</span>
+            </div>
+            <button class="refresh-btn" onclick="fetchData()">yenile</button>
+        </div>
 
-  <div class="metric-grid">
-    <div class="metric">
-      <div class="metric-label">long sinyali</div>
-      <div class="metric-value long" id="long-count">—</div>
-      <div class="metric-sub">son analiz</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">short sinyali</div>
-      <div class="metric-value short" id="short-count">—</div>
-      <div class="metric-sub">son analiz</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">son kapanış</div>
-      <div class="metric-value neutral" id="close-price">—</div>
-      <div class="metric-sub" id="coin-sym">—</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">son veri</div>
-      <div class="metric-value neutral" style="font-size:14px;" id="timestamp">—</div>
-      <div class="metric-sub">UTC</div>
-    </div>
-  </div>
+        <div class="metric-grid">
+            <div class="metric">
+                <div class="metric-label">işleme alınan</div>
+                <div class="metric-value long" id="processed-count">—</div>
+                <div class="metric-sub">son sinyal</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">atlanan</div>
+                <div class="metric-value short" id="skipped-count">—</div>
+                <div class="metric-sub">son sinyal</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">long işlem</div>
+                <div class="metric-value long" id="long-count">—</div>
+                <div class="metric-sub">son sinyal</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">short işlem</div>
+                <div class="metric-value short" id="short-count">—</div>
+                <div class="metric-sub">son sinyal</div>
+            </div>
+        </div>
 
-  <div class="info-grid">
-    <div class="info-card">
-      <div class="info-card-label">coin macd</div>
-      <div id="coin-macd">—</div>
-    </div>
-    <div class="info-card">
-      <div class="info-card-label">btc ema</div>
-      <div id="btc-ema">—</div>
-    </div>
-    <div class="info-card">
-      <div class="info-card-label">btc macd</div>
-      <div id="btc-macd">—</div>
-    </div>
-  </div>
+        <div class="conn-bar">
+            <span>sunucu durumu:</span>
+            <span id="conn-text" style="color:#aaa;">kontrol ediliyor...</span>
+            <span class="conn-url" id="conn-url"></span>
+            <span style="font-size:12px;color:#aaa;margin-left:12px;" id="last-signal-time"></span>
+        </div>
 
-  <div class="conn-bar">
-    <span>sunucu durumu:</span>
-    <span id="conn-text" style="color:#aaa;">kontrol ediliyor...</span>
-    <span class="conn-url" id="conn-url"></span>
-  </div>
+        <div class="section-title">işleme alınan sinyaller — son analiz</div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>coin</th>
+                        <th>yön</th>
+                        <th>fiyat</th>
+                        <th>tutar</th>
+                        <th>kaldıraç</th>
+                        <th>sl fiyatı</th>
+                        <th>tp fiyatı</th>
+                        <th>öncelik</th>
+                        <th>limit</th>
+                    </tr>
+                </thead>
+                <tbody id="processed-table">
+                    <tr>
+                        <td colspan="9" class="empty">henüz sinyal işlenmedi</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
-  <div class="section-title">sinyal tablosu — son analiz</div>
-  <div class="table-wrap">
-    <table>
-      <thead>
+        <div class="section-title">atlanan sinyaller — son analiz</div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>coin</th>
+                        <th>yön</th>
+                        <th>fiyat</th>
+                        <th>tutar</th>
+                        <th>limit</th>
+                        <th>neden atlandı</th>
+                    </tr>
+                </thead>
+                <tbody id="skipped-table">
+                    <tr>
+                        <td colspan="6" class="empty">atlanan sinyal yok</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API = '';
+
+        function formatTs(ts) {
+            if (!ts) return '—';
+            try {
+                return new Date(ts).toISOString().replace('T', ' ').substring(0, 16);
+            } catch (e) {
+                return ts;
+            }
+        }
+
+        function timeSince(ts) {
+            if (!ts) return '';
+            const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
+            if (diff < 60) return diff + 's önce';
+            if (diff < 3600) return Math.floor(diff / 60) + 'dk önce';
+            return Math.floor(diff / 3600) + 'sa önce';
+        }
+
+        async function fetchData() {
+            const connText = document.getElementById('conn-text');
+            document.getElementById('conn-url').textContent = window.location.host;
+            try {
+                const [healthRes, statusRes] = await Promise.all([
+                    fetch(API + '/health'),
+                    fetch(API + '/status')
+                ]);
+                if (healthRes.ok) {
+                    connText.textContent = 'aktif';
+                    connText.className = 'conn-ok';
+                    document.getElementById('live-dot').style.background = '#3a9e6e';
+                } else {
+                    connText.textContent = 'hata';
+                    connText.className = 'conn-err';
+                    document.getElementById('live-dot').style.background = '#c04b3a';
+                }
+                const data = await statusRes.json();
+                const processed = data.processed || [];
+                const skipped = data.skipped || [];
+                document.getElementById('processed-count').textContent = processed.length;
+                document.getElementById('skipped-count').textContent = skipped.length;
+                document.getElementById('long-count').textContent = processed.filter(s => s.direction === 'Long').length;
+                document.getElementById('short-count').textContent = processed.filter(s => s.direction === 'Short').length;
+                document.getElementById('last-update').textContent = timeSince(data.timestamp);
+                document.getElementById('last-signal-time').textContent = data.timestamp ? 'son sinyal: ' + formatTs(data.timestamp) : '';
+
+                const ptbody = document.getElementById('processed-table');
+                if (processed.length === 0) {
+                    ptbody.innerHTML = '<tr><td colspan="9" class="empty">henüz sinyal işlenmedi</td></tr>';
+                } else {
+                    ptbody.innerHTML = processed.map(s => `
         <tr>
-          <th>sistem</th>
-          <th>ema</th>
-          <th>önceki</th>
-          <th>şimdiki</th>
-          <th>giriş</th>
-          <th>yön</th>
-        </tr>
-      </thead>
-      <tbody id="signal-table-body">
-        <tr><td colspan="6" class="empty">veri bekleniyor...</td></tr>
-      </tbody>
-    </table>
-  </div>
+          <td><strong>${s.symbol}</strong></td>
+          <td><span class="badge ${s.direction==='Long'?'long':'short'}">${s.direction}</span></td>
+          <td>${s.price}</td>
+          <td>$${s.amount}</td>
+          <td>${s.leverage}x</td>
+          <td style="color:#c04b3a;">${s.sl_price||'—'}</td>
+          <td style="color:#2d8f5e;">${s.tp_price||'—'}</td>
+          <td>${s.priority}</td>
+          <td>$${s.total_amount}</td>
+        </tr>`).join('');
+                }
 
-  <div class="section-title">geçmiş sinyaller</div>
-  <div class="history-list" id="history-list">
-    <div class="empty">henüz sinyal gelmedi</div>
-  </div>
-</div>
+                const stbody = document.getElementById('skipped-table');
+                if (skipped.length === 0) {
+                    stbody.innerHTML = '<tr><td colspan="6" class="empty">atlanan sinyal yok</td></tr>';
+                } else {
+                    stbody.innerHTML = skipped.map(s => `
+        <tr>
+          <td><strong>${s.symbol}</strong></td>
+          <td><span class="badge ${s.direction==='Long'?'long':'short'}">${s.direction}</span></td>
+          <td>${s.price}</td>
+          <td>$${s.amount}</td>
+          <td>$${s.total_amount}</td>
+          <td style="color:#c04b3a;">${s.reason||'—'}</td>
+        </tr>`).join('');
+                }
+            } catch (e) {
+                connText.textContent = 'sunucuya ulaşılamıyor';
+                connText.className = 'conn-err';
+                document.getElementById('live-dot').style.background = '#c04b3a';
+            }
+        }
 
-<script>
-const API = '';
-let history = [];
-
-function setBadge(el, val) {
-  if (!el) return;
-  if (val === 'Long') {
-    el.innerHTML = '<span class="badge long">Long</span>';
-  } else if (val === 'Short') {
-    el.innerHTML = '<span class="badge short">Short</span>';
-  } else {
-    el.innerHTML = '<span class="badge neutral">' + (val || '—') + '</span>';
-  }
-}
-
-function formatTs(ts) {
-  if (!ts) return '—';
-  try { return new Date(ts).toISOString().replace('T', ' ').substring(0, 16); }
-  catch(e) { return ts; }
-}
-
-function timeSince(ts) {
-  if (!ts) return '';
-  const diff = Math.floor((Date.now() - new Date(ts)) / 1000);
-  if (diff < 60) return diff + 's önce';
-  if (diff < 3600) return Math.floor(diff/60) + 'dk önce';
-  return Math.floor(diff/3600) + 'sa önce';
-}
-
-async function fetchData() {
-  const connText = document.getElementById('conn-text');
-  document.getElementById('conn-url').textContent = window.location.host;
-  try {
-    const [healthRes, statusRes] = await Promise.all([
-      fetch(API + '/health'),
-      fetch(API + '/status')
-    ]);
-    if (healthRes.ok) {
-      connText.textContent = 'aktif';
-      connText.className = 'conn-ok';
-      document.getElementById('live-dot').style.background = '#3a9e6e';
-    } else {
-      connText.textContent = 'hata';
-      connText.className = 'conn-err';
-      document.getElementById('live-dot').style.background = '#c04b3a';
-    }
-    const data = await statusRes.json();
-    document.getElementById('long-count').textContent = data.long_giris ?? '—';
-    document.getElementById('short-count').textContent = data.short_giris ?? '—';
-    document.getElementById('close-price').textContent = data.close_pos != null ? data.close_pos.toFixed(4) : '—';
-    document.getElementById('coin-sym').textContent = data.coin_symbol || '—';
-    document.getElementById('timestamp').textContent = formatTs(data.timestamp);
-    document.getElementById('last-update').textContent = timeSince(data.timestamp);
-    setBadge(document.getElementById('coin-macd'), data.coin_macd);
-    setBadge(document.getElementById('btc-ema'), data.btc_ema);
-    setBadge(document.getElementById('btc-macd'), data.btc_macd);
-    if (data.signals && data.signals.length > 0) {
-      const tbody = document.getElementById('signal-table-body');
-      tbody.innerHTML = '';
-      data.signals.forEach(s => {
-        const tr = document.createElement('tr');
-        const dc = s.giris_yonu === 'Long' ? 'dir-long' : s.giris_yonu === 'Short' ? 'dir-short' : 'dir-none';
-        tr.innerHTML = `<td>${s.sistem_no}</td><td>${s.ema1}–${s.ema2}</td><td>${s.onceki||'—'}</td><td>${s.simdi||'—'}</td><td>${s.sisteme_giris?'evet':'hayır'}</td><td class="${dc}">${s.giris_yonu||'—'}</td>`;
-        tbody.appendChild(tr);
-      });
-    }
-    if (data.timestamp && (data.long_giris + data.short_giris) > 0) {
-      const key = data.timestamp;
-      if (!history.find(h => h.ts === key)) {
-        history.unshift({ ts: key, symbol: data.coin_symbol, close: data.close_pos, long: data.long_giris, short: data.short_giris });
-        if (history.length > 20) history.pop();
-        renderHistory();
-      }
-    }
-  } catch(e) {
-    connText.textContent = 'sunucuya ulaşılamıyor';
-    connText.className = 'conn-err';
-    document.getElementById('live-dot').style.background = '#c04b3a';
-  }
-}
-
-function renderHistory() {
-  const el = document.getElementById('history-list');
-  if (history.length === 0) { el.innerHTML = '<div class="empty">henüz sinyal gelmedi</div>'; return; }
-  el.innerHTML = history.map(h => `
-    <div class="history-item">
-      <div class="history-signal">
-        ${h.long > 0 ? `<span class="badge long">Long x${h.long}</span>` : ''}
-        ${h.short > 0 ? `<span class="badge short">Short x${h.short}</span>` : ''}
-        <span style="color:#888; font-size:13px;">${h.symbol} — ${h.close?.toFixed(4)}</span>
-      </div>
-      <span class="history-time">${formatTs(h.ts)}</span>
-    </div>`).join('');
-}
-
-fetchData();
-setInterval(fetchData, 30000);
-</script>
+        fetchData();
+        setInterval(fetchData, 30000);
+    </script>
 </body>
+
 </html>
