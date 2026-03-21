@@ -1,3 +1,4 @@
 flask
 flask-cors
 pybit
+python-dotenv

@@ -2,6 +2,10 @@ import threading
 import logging
 from datetime import datetime
 
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
 from flask import Flask, request, jsonify, abort, send_file
 from flask_cors import CORS
 import pybit
@@ -21,13 +25,10 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # ── Bybit API — Testnet ────────────────────────────────────────────────────────
-# Long işlemler için hesap
-BYBIT_LONG_API_KEY    = "BURAYA_LONG_API_KEY"
-BYBIT_LONG_API_SECRET = "BURAYA_LONG_SECRET"
-
-# Short işlemler için hesap
-BYBIT_SHORT_API_KEY    = "BURAYA_SHORT_API_KEY"
-BYBIT_SHORT_API_SECRET = "BURAYA_SHORT_SECRET"
+BYBIT_LONG_API_KEY    = os.getenv("BYBIT_LONG_API_KEY")
+BYBIT_LONG_API_SECRET = os.getenv("BYBIT_LONG_API_SECRET")
+BYBIT_SHORT_API_KEY   = os.getenv("BYBIT_SHORT_API_KEY")
+BYBIT_SHORT_API_SECRET = os.getenv("BYBIT_SHORT_API_SECRET")
 
 # Testnet=True → gerçek para kullanılmaz. Canlıya geçince False yap.
 client_long  = HTTP(testnet=True, api_key=BYBIT_LONG_API_KEY,  api_secret=BYBIT_LONG_API_SECRET)
