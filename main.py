@@ -106,6 +106,10 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     sl_pct  = stop loss yüzdesi
     tp_pct  = take profit yüzdesi
     """
+    # Sembol 1000 ile başlıyorsa fiyatı 1000 ile çarp
+    if symbol.startswith("1000"):
+        price = price * 1000
+        
     side = "Buy" if direction == "Long" else "Sell"
     step, min_qty = get_qty_step(client, symbol)
     qty = round_qty(amount / price, step)
