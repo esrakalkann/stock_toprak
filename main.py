@@ -110,6 +110,10 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     #if symbol.startswith("1000"):
      #   price = price * 1000
 
+     # Bybit'ten anlık fiyatı çek
+    ticker = client.get_tickers(category="linear", symbol=symbol)
+    price = float(ticker["result"]["list"][0]["lastPrice"])
+
     side = "Buy" if direction == "Long" else "Sell"
     step, min_qty = get_qty_step(client, symbol)
     qty = round_qty(amount / price, step)
