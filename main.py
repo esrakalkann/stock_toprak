@@ -60,7 +60,7 @@ def get_open_positions(client, symbol):
         for p in positions:
             size = float(p.get("size", 0))
             avg_price = float(p.get("avgPrice", 0))
-            if size > 0:
+            if size > 0 and avg_price > 0:
                 count += 1
                 total_used += size * avg_price
         log.info(f"{symbol} pozisyon sorgusu → toplam kullanılan: {total_used}")
