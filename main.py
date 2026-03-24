@@ -63,6 +63,7 @@ def get_open_positions(client, symbol):
             if size > 0:
                 count += 1
                 total_used += size * avg_price
+        log.info(f"{symbol} pozisyon sorgusu → toplam kullanılan: {total_used}")
         return count, total_used
     except Exception as e:
         log.error(f"Pozisyon sorgu hatası ({symbol}): {e}")
