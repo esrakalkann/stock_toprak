@@ -233,9 +233,29 @@
             padding: 2rem;
         }
         
+        .pnl-pos {
+            color: #2d8f5e;
+            font-weight: 500;
+        }
+        
+        .pnl-neg {
+            color: #c04b3a;
+            font-weight: 500;
+        }
+        
+        .positions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 1.5rem;
+        }
+        
         @media (max-width: 700px) {
             .metric-grid {
                 grid-template-columns: repeat(2, 1fr);
+            }
+            .positions-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -264,14 +284,14 @@
                 <div class="metric-sub">son sinyal</div>
             </div>
             <div class="metric">
-                <div class="metric-label">long işlem</div>
-                <div class="metric-value long" id="long-count">—</div>
-                <div class="metric-sub">son sinyal</div>
+                <div class="metric-label">açık long</div>
+                <div class="metric-value long" id="long-open-count">—</div>
+                <div class="metric-sub">anlık</div>
             </div>
             <div class="metric">
-                <div class="metric-label">short işlem</div>
-                <div class="metric-value short" id="short-count">—</div>
-                <div class="metric-sub">son sinyal</div>
+                <div class="metric-label">açık short</div>
+                <div class="metric-value short" id="short-open-count">—</div>
+                <div class="metric-sub">anlık</div>
             </div>
         </div>
 
@@ -280,6 +300,53 @@
             <span id="conn-text" style="color:#aaa;">kontrol ediliyor...</span>
             <span class="conn-url" id="conn-url"></span>
             <span style="font-size:12px;color:#aaa;margin-left:12px;" id="last-signal-time"></span>
+        </div>
+
+        <div class="positions-grid">
+            <div>
+                <div class="section-title">açık long pozisyonlar</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>coin</th>
+                                <th>miktar</th>
+                                <th>ort. fiyat</th>
+                                <th>sl</th>
+                                <th>tp</th>
+                                <th>pnl</th>
+                            </tr>
+                        </thead>
+                        <tbody id="long-positions-table">
+                            <tr>
+                                <td colspan="6" class="empty">açık pozisyon yok</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div>
+                <div class="section-title">açık short pozisyonlar</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>coin</th>
+                                <th>miktar</th>
+                                <th>ort. fiyat</th>
+                                <th>sl</th>
+                                <th>tp</th>
+                                <th>pnl</th>
+                            </tr>
+                        </thead>
+                        <tbody id="short-positions-table">
+                            <tr>
+                                <td colspan="6" class="empty">açık pozisyon yok</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <div class="section-title">işleme alınan sinyaller — son analiz</div>
@@ -348,6 +415,27 @@
             return Math.floor(diff / 3600) + 'sa önce';
         }
 
+        function renderPositions(positions, tbodyId) {
+            const tbody = document.getElementById(tbodyId);
+            if (!positions || positions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty">açık pozisyon yok</td></tr>';
+                return;
+            }
+            tbody.innerHTML = positions.map(p => {
+                const pnl = parseFloat(p.unrealized_pnl || 0);
+                const pnlClass = pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+                const pnlStr = (pnl >= 0 ? '+' : '') + pnl.toFixed(4);
+                return `<tr>
+      <td><strong>${p.symbol}</strong></td>
+      <td>${p.size}</td>
+      <td>${p.avg_price}</td>
+      <td style="color:#c04b3a;">${p.sl || '—'}</td>
+      <td style="color:#2d8f5e;">${p.tp || '—'}</td>
+      <td class="${pnlClass}">${pnlStr}</td>
+    </tr>`;
+            }).join('');
+        }
+
         async function fetchData() {
             const connText = document.getElementById('conn-text');
             document.getElementById('conn-url').textContent = window.location.host;
@@ -368,12 +456,18 @@
                 const data = await statusRes.json();
                 const processed = data.processed || [];
                 const skipped = data.skipped || [];
+                const longPos = data.long_positions || [];
+                const shortPos = data.short_positions || [];
+
                 document.getElementById('processed-count').textContent = processed.length;
                 document.getElementById('skipped-count').textContent = skipped.length;
-                document.getElementById('long-count').textContent = processed.filter(s => s.direction === 'Long').length;
-                document.getElementById('short-count').textContent = processed.filter(s => s.direction === 'Short').length;
+                document.getElementById('long-open-count').textContent = longPos.length;
+                document.getElementById('short-open-count').textContent = shortPos.length;
                 document.getElementById('last-update').textContent = timeSince(data.timestamp);
                 document.getElementById('last-signal-time').textContent = data.timestamp ? 'son sinyal: ' + formatTs(data.timestamp) : '';
+
+                renderPositions(longPos, 'long-positions-table');
+                renderPositions(shortPos, 'short-positions-table');
 
                 const ptbody = document.getElementById('processed-table');
                 if (processed.length === 0) {
