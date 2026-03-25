@@ -70,6 +70,28 @@ def get_open_positions(client, symbol):
         log.error(f"Pozisyon sorgu hatası ({symbol}): {e}")
         return 0, 0.0
 
+def get_all_positions(client):
+    """Tüm açık pozisyonları çeker."""
+    try:
+        resp = client.get_positions(category="linear", settleCoin="USDT")
+        positions = resp.get("result", {}).get("list", [])
+        result = []
+        for p in positions:
+            size = float(p.get("size", 0))
+            if size > 0:
+                result.append({
+                    "symbol": p.get("symbol"),
+                    "direction": "Long" if p.get("side") == "Buy" else "Short",
+                    "size": size,
+                    "avg_price": float(p.get("avgPrice", 0)),
+                    "unrealized_pnl": float(p.get("unrealisedPnl", 0)),
+                    "sl": p.get("stopLoss"),
+                    "tp": p.get("takeProfit"),
+                })
+        return result
+    except Exception as e:
+        log.error(f"Pozisyon listesi hatası: {e}")
+        return []
 
 def set_leverage(client, symbol, leverage):
     """Kaldıraç ayarla."""
@@ -304,8 +326,13 @@ def receive_signal():
 
 @app.route('/status', methods=['GET'])
 def get_status():
+    long_positions  = get_all_positions(client_long)
+    short_positions = get_all_positions(client_short)
     with state_lock:
-        return jsonify(last_status), 200
+        data = dict(last_status)
+    data["long_positions"]  = long_positions
+    data["short_positions"] = short_positions
+    return jsonify(data), 200
 
 
 @app.route('/health', methods=['GET'])
