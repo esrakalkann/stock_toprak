@@ -73,7 +73,7 @@ def get_open_positions(client, symbol):
 def get_all_positions(client):
     """Tüm açık pozisyonları çeker."""
     try:
-        resp = client.get_positions(category="linear", settleCoin="USDT")
+        resp = client.get_positions(category="linear")
         positions = resp.get("result", {}).get("list", [])
         result = []
         for p in positions:
