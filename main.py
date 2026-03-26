@@ -91,6 +91,7 @@ def get_all_positions(client):
         return result
     except Exception as e:
         log.error(f"Pozisyon listesi hatası: {e}")
+        log.info(f"Short pozisyon sorgusu sonucu: {positions}")
         return []
 
 def set_leverage(client, symbol, leverage):
