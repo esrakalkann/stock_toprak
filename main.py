@@ -75,6 +75,7 @@ def get_all_positions(client):
     try:
         resp = client.get_positions(category="linear", settleCoin="USDT")
         positions = resp.get("result", {}).get("list", [])
+        log.info(f"Ham pozisyon listesi: {positions}")  # buraya taşı
         result = []
         for p in positions:
             size = float(p.get("size", 0))
@@ -91,8 +92,8 @@ def get_all_positions(client):
         return result
     except Exception as e:
         log.error(f"Pozisyon listesi hatası: {e}")
-        log.info(f"Short pozisyon sorgusu sonucu: {positions}")
         return []
+    
 
 def set_leverage(client, symbol, leverage):
     """Kaldıraç ayarla."""
