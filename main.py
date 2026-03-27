@@ -165,7 +165,7 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
             qty=str(qty),
             stopLoss=str(sl_price),
             takeProfit=str(tp_price),
-            timeInForce="IOC"
+            timeInForce="GTC"
         )
         log.info(f"İşlem açıldı: {symbol} {direction} | Miktar:{qty} | SL:{sl_price} | TP:{tp_price}")
         return True, resp
