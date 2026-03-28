@@ -170,7 +170,10 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
         log.info(f"İşlem açıldı: {symbol} {direction} | Miktar:{qty} | SL:{sl_price} | TP:{tp_price}")
         return True, resp
     except Exception as e:
+        #log.error(f"İşlem açma hatası ({symbol}): {e}")
+        import traceback
         log.error(f"İşlem açma hatası ({symbol}): {e}")
+        log.error(traceback.format_exc())
         return False, str(e)
 
 
