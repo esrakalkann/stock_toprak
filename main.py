@@ -140,6 +140,19 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     ticker = client.get_tickers(category="linear", symbol=symbol)
     price = float(ticker["result"]["list"][0]["lastPrice"])
 
+        # Max kaldıraç kontrolü
+    try:
+        instrument = client.get_instruments_info(category="linear", symbol=symbol)
+        max_leverage = float(instrument["result"]["list"][0]["leverageFilter"]["maxLeverage"])
+        if leverage > max_leverage:
+            total = amount * leverage
+            leverage = int(max_leverage)
+            amount = total / leverage
+            log.info(f"{symbol}: Kaldıraç {leverage}x'e düşürüldü, tutar {amount:.2f}$ olarak güncellendi")
+    except Exception as e:
+        log.warning(f"Max kaldıraç sorgu hatası ({symbol}): {e}")
+
+
     side = "Buy" if direction == "Long" else "Sell"
     step, min_qty = get_qty_step(client, symbol)
     qty = round_qty(amount / price, step)
@@ -154,17 +167,6 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
         sl_price = round(price * (1 + sl_pct / 100), 6)
         tp_price = round(price * (1 - tp_pct / 100), 6)
     
-    # Max kaldıraç kontrolü
-    try:
-        instrument = client.get_instruments_info(category="linear", symbol=symbol)
-        max_leverage = float(instrument["result"]["list"][0]["leverageFilter"]["maxLeverage"])
-        if leverage > max_leverage:
-            total = amount * leverage
-            leverage = int(max_leverage)
-            amount = total / leverage
-            log.info(f"{symbol}: Kaldıraç {leverage}x'e düşürüldü, tutar {amount:.2f}$ olarak güncellendi")
-    except Exception as e:
-        log.warning(f"Max kaldıraç sorgu hatası ({symbol}): {e}")
 
     set_leverage(client, symbol, leverage)
 
