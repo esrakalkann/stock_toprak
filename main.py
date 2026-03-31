@@ -110,6 +110,8 @@ def get_total_used(client):
     except Exception as e:
         log.error(f"Toplam pozisyon sorgu hatası: {e}")
         return 0.0
+
+def set_leverage(client, symbol, leverage):
     """Kaldıraç ayarla."""
     try:
         client.set_leverage(
@@ -150,14 +152,14 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     #if symbol.startswith("1000"):
      #   price = price * 1000
 
-    # Bybit'ten anlık fiyatı çek
+     # Bybit'ten anlık fiyatı çek
     ticker = client.get_tickers(category="linear", symbol=symbol)
     if not ticker["result"]["list"]:
         log.error(f"{symbol}: Bybit'te bulunamadı, işlem atlandı")
         return False, "Sembol bulunamadı"
     price = float(ticker["result"]["list"][0]["lastPrice"])
 
-        # Max kaldıraç kontrolü
+    # Max kaldıraç kontrolü
     try:
         instrument = client.get_instruments_info(category="linear", symbol=symbol)
         max_leverage = float(instrument["result"]["list"][0]["leverageFilter"]["maxLeverage"])
