@@ -95,7 +95,21 @@ def get_all_positions(client):
         return []
     
 
-def set_leverage(client, symbol, leverage):
+def get_total_used(client):
+    """Tüm açık pozisyonların toplam tutarını döner."""
+    try:
+        resp = client.get_positions(category="linear", settleCoin="USDT")
+        positions = resp.get("result", {}).get("list", [])
+        total = 0.0
+        for p in positions:
+            size = float(p.get("size", 0))
+            avg_price = float(p.get("avgPrice", 0) or 0)
+            if size > 0 and avg_price > 0:
+                total += size * avg_price
+        return total
+    except Exception as e:
+        log.error(f"Toplam pozisyon sorgu hatası: {e}")
+        return 0.0
     """Kaldıraç ayarla."""
     try:
         client.set_leverage(
@@ -136,8 +150,11 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     #if symbol.startswith("1000"):
      #   price = price * 1000
 
-     # Bybit'ten anlık fiyatı çek
+    # Bybit'ten anlık fiyatı çek
     ticker = client.get_tickers(category="linear", symbol=symbol)
+    if not ticker["result"]["list"]:
+        log.error(f"{symbol}: Bybit'te bulunamadı, işlem atlandı")
+        return False, "Sembol bulunamadı"
     price = float(ticker["result"]["list"][0]["lastPrice"])
 
         # Max kaldıraç kontrolü
@@ -238,16 +255,22 @@ def process_signals(signals):
 
         client = client_long if direction == "Long" else client_short
 
-        # Açık pozisyon kontrolü
-        _, total_used = get_open_positions(client, symbol)
+        # Toplam açık pozisyon kontrolü (tüm coinlerin toplamı)
+        total_used = get_total_used(client)
         if total_used + amount > total_amount:
-            reason = f"Limit aşılır ({total_used:.0f}+{amount} > {total_amount})"
+            reason = f"Limit aşılır (toplam {total_used:.0f}+{amount} > {total_amount})"
             log.info(f"{symbol} atlandı: {reason}")
             skipped.append({**sig, "reason": reason})
             continue
 
         # İşlemi aç
-        success, resp = place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_pct)
+        try:
+            success, resp = place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_pct)
+        except Exception as e:
+            import traceback
+            log.error(f"{symbol} işlem hatası: {e}")
+            log.error(traceback.format_exc())
+            success, resp = False, str(e)
         if success:
             processed.append({**sig, "sl_price": round(price*(1-sl_pct/100),6) if direction=="Long" else round(price*(1+sl_pct/100),6),
                                "tp_price": round(price*(1+tp_pct/100),6) if direction=="Long" else round(price*(1-tp_pct/100),6)})
