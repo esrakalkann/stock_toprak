@@ -95,21 +95,21 @@ def get_all_positions(client):
         return []
     
 
-def get_total_used(client):
-    """Tüm açık pozisyonların toplam tutarını döner."""
-    try:
-        resp = client.get_positions(category="linear", settleCoin="USDT")
-        positions = resp.get("result", {}).get("list", [])
-        total = 0.0
-        for p in positions:
-            size = float(p.get("size", 0))
-            avg_price = float(p.get("avgPrice", 0) or 0)
-            if size > 0 and avg_price > 0:
-                total += size * avg_price
-        return total
-    except Exception as e:
-        log.error(f"Toplam pozisyon sorgu hatası: {e}")
-        return 0.0
+def get_total_used():
+    """Her iki hesaptaki tüm açık pozisyonların toplam tutarını döner."""
+    total = 0.0
+    for client in [client_long, client_short]:
+        try:
+            resp = client.get_positions(category="linear", settleCoin="USDT")
+            positions = resp.get("result", {}).get("list", [])
+            for p in positions:
+                size = float(p.get("size", 0))
+                avg_price = float(p.get("avgPrice", 0) or 0)
+                if size > 0 and avg_price > 0:
+                    total += size * avg_price
+        except Exception as e:
+            log.error(f"Toplam pozisyon sorgu hatası: {e}")
+    return total
 
 def set_leverage(client, symbol, leverage):
     """Kaldıraç ayarla."""
@@ -258,7 +258,7 @@ def process_signals(signals):
         client = client_long if direction == "Long" else client_short
 
         # Toplam açık pozisyon kontrolü (tüm coinlerin toplamı)
-        total_used = get_total_used(client)
+        total_used = get_total_used()
         if total_used + amount > total_amount:
             reason = f"Limit aşılır (toplam {total_used:.0f}+{amount} > {total_amount})"
             log.info(f"{symbol} atlandı: {reason}")
