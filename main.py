@@ -188,6 +188,7 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
         sl_price = round(price * (1 + sl_pct / 100), 6)
         tp_price = round(price * (1 - tp_pct / 100), 6)
     
+    log.info(f"Bybit fiyatı: {price} | SL: {sl_price} | TP: {tp_price} | Yön: {direction}")
 
     set_leverage(client, symbol, leverage)
 
@@ -198,8 +199,8 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
             side=side,
             orderType="Market",
             qty=str(qty),
-            #stopLoss=str(sl_price),
-            #takeProfit=str(tp_price),
+            stopLoss=str(sl_price),
+            takeProfit=str(tp_price),
             #timeInForce="GTC"
             positionIdx=0
         )
