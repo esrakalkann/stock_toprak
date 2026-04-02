@@ -94,7 +94,6 @@ def get_all_positions(client):
         log.error(f"Pozisyon listesi hatası: {e}")
         return []
     
-
 def get_total_used():
     """Her iki hesaptaki tüm açık pozisyonların toplam tutarını döner."""
     total = 0.0
@@ -105,10 +104,13 @@ def get_total_used():
             for p in positions:
                 size = float(p.get("size", 0))
                 avg_price = float(p.get("avgPrice", 0) or 0)
-                if size > 0 and avg_price > 0:
+                status = p.get("positionStatus", "")
+                if size > 0 and avg_price > 0 and status == "Normal":
                     total += size * avg_price
+                    log.info(f"Pozisyon sayıldı: {p.get('symbol')} size={size} avgPrice={avg_price} değer={size*avg_price:.2f}")
         except Exception as e:
             log.error(f"Toplam pozisyon sorgu hatası: {e}")
+    log.info(f"Toplam kullanılan: {total:.2f}")
     return total
 
 def set_leverage(client, symbol, leverage):
