@@ -198,8 +198,8 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
             side=side,
             orderType="Market",
             qty=str(qty),
-            stopLoss=str(sl_price),
-            takeProfit=str(tp_price),
+            #stopLoss=str(sl_price),
+            #takeProfit=str(tp_price),
             #timeInForce="GTC"
             positionIdx=0
         )
