@@ -1,5 +1,6 @@
 import threading
 import logging
+import time
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -39,6 +40,8 @@ state_lock   = threading.Lock()
 
 # Bekleyen sinyaller — her 4 saatlik kapanışta birikir, sonra işleme alınır
 pending_signals = []
+last_process_time = 0
+BATCH_WINDOW = 30  # saniye — bu süre içinde gelen sinyaller birlikte işlenir
 
 # Dashboard için son durum
 last_status = {
@@ -316,7 +319,7 @@ def receive_signal():
         "tp": 8
     }
     """
-    global pending_signals, last_status
+    global pending_signals, last_status, last_process_time
 
     try:
         data = request.get_json(force=True)
@@ -353,15 +356,21 @@ def receive_signal():
 
     with state_lock:
         pending_signals.append(signal)
-        processed, skipped = process_signals(pending_signals)
-        pending_signals = []
+        
+        now = time.time()
+        if now - last_process_time >= BATCH_WINDOW:
+            last_process_time = now
+            processed, skipped = process_signals(pending_signals)
+            pending_signals = []
 
-        last_status = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "processed": processed,
-            "skipped": skipped,
-            "open_positions": []
-        }
+            last_status = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "processed": processed,
+                "skipped": skipped,
+                "open_positions": []
+            }
+        else:
+            processed, skipped = [], []
 
     return jsonify({
         "message": "Sinyal işlendi",
