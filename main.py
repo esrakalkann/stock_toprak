@@ -82,7 +82,9 @@ def get_all_positions(client):
         result = []
         for p in positions:
             size = float(p.get("size", 0))
-            if size > 0:
+            position_idx = int(p.get("positionIdx", 0))
+            # Hedge mode: Long=1, Short=2. positionIdx=0 olan boş (one-way artık yok) atla
+            if size > 0 and position_idx in [1, 2]:
                 result.append({
                     "symbol": p.get("symbol"),
                     "direction": "Long" if p.get("side") == "Buy" else "Short",
@@ -108,7 +110,9 @@ def get_total_used():
                 size = float(p.get("size", 0))
                 avg_price = float(p.get("avgPrice", 0) or 0)
                 status = p.get("positionStatus", "")
-                if size > 0 and avg_price > 0 and status == "Normal":
+                position_idx = int(p.get("positionIdx", 0))
+                # Hedge mode: 1=Long, 2=Short. positionIdx=0 boş satır olabilir, atla
+                if size > 0 and avg_price > 0 and status == "Normal" and position_idx in [1, 2]:
                     total += size * avg_price
                     log.info(f"Pozisyon sayıldı: {p.get('symbol')} size={size} avgPrice={avg_price} değer={size*avg_price:.2f}")
         except Exception as e:
@@ -178,6 +182,9 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
 
 
     side = "Buy" if direction == "Long" else "Sell"
+    # Hedge Mode: Long=1, Short=2
+    position_idx = 1 if direction == "Long" else 2
+
     step, min_qty = get_qty_step(client, symbol)
     qty = round_qty(amount / price, step)
     if qty < min_qty:
@@ -191,7 +198,7 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
         sl_price = round(price * (1 + sl_pct / 100), 6)
         tp_price = round(price * (1 - tp_pct / 100), 6)
     
-    log.info(f"Bybit fiyatı: {price} | SL: {sl_price} | TP: {tp_price} | Yön: {direction}")
+    log.info(f"Bybit fiyatı: {price} | SL: {sl_price} | TP: {tp_price} | Yön: {direction} | positionIdx: {position_idx}")
 
     set_leverage(client, symbol, leverage)
 
@@ -204,8 +211,7 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
             qty=str(qty),
             stopLoss=str(sl_price),
             takeProfit=str(tp_price),
-            #timeInForce="GTC"
-            positionIdx=0
+            positionIdx=position_idx
         )
         log.info(f"İşlem açıldı: {symbol} {direction} | Miktar:{qty} | SL:{sl_price} | TP:{tp_price}")
         return True, resp
