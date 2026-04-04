@@ -82,9 +82,9 @@ def get_all_positions(client):
         result = []
         for p in positions:
             size = float(p.get("size", 0))
-            position_idx = int(p.get("positionIdx", 0))
+            #position_idx = int(p.get("positionIdx", 0))
             # Hedge mode: Long=1, Short=2. positionIdx=0 olan boş (one-way artık yok) atla
-            if size > 0 and position_idx in [1, 2]:
+            if size > 0 :
                 result.append({
                     "symbol": p.get("symbol"),
                     "direction": "Long" if p.get("side") == "Buy" else "Short",
@@ -110,9 +110,9 @@ def get_total_used():
                 size = float(p.get("size", 0))
                 avg_price = float(p.get("avgPrice", 0) or 0)
                 status = p.get("positionStatus", "")
-                position_idx = int(p.get("positionIdx", 0))
+                #position_idx = int(p.get("positionIdx", 0))
                 # Hedge mode: 1=Long, 2=Short. positionIdx=0 boş satır olabilir, atla
-                if size > 0 and avg_price > 0 and status == "Normal" and position_idx in [1, 2]:
+                if size > 0 and avg_price > 0 and status == "Normal":
                     total += size * avg_price
                     log.info(f"Pozisyon sayıldı: {p.get('symbol')} size={size} avgPrice={avg_price} değer={size*avg_price:.2f}")
         except Exception as e:
