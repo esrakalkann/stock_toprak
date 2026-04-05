@@ -82,9 +82,7 @@ def get_all_positions(client):
         result = []
         for p in positions:
             size = float(p.get("size", 0))
-            #position_idx = int(p.get("positionIdx", 0))
-            # Hedge mode: Long=1, Short=2. positionIdx=0 olan boş (one-way artık yok) atla
-            if size > 0 :
+            if size > 0:
                 result.append({
                     "symbol": p.get("symbol"),
                     "direction": "Long" if p.get("side") == "Buy" else "Short",
@@ -99,10 +97,16 @@ def get_all_positions(client):
         log.error(f"Pozisyon listesi hatası: {e}")
         return []
     
-def get_total_used():
-    """Her iki hesaptaki tüm açık pozisyonların toplam tutarını döner."""
-    total = 0.0
-    for client in [client_long, client_short]:
+def get_net_used():
+    """
+    Her coin için net pozisyon değerini hesaplar.
+    Net = |Long değeri - Short değeri|
+    Toplam = tüm coinlerin net değerlerinin toplamı.
+    Hedge pozisyonlar limiti gereksiz doldurmaz.
+    """
+    positions_by_symbol = {}  # symbol -> {"long": 0.0, "short": 0.0}
+
+    for client, direction in [(client_long, "long"), (client_short, "short")]:
         try:
             resp = client.get_positions(category="linear", settleCoin="USDT")
             positions = resp.get("result", {}).get("list", [])
@@ -110,15 +114,23 @@ def get_total_used():
                 size = float(p.get("size", 0))
                 avg_price = float(p.get("avgPrice", 0) or 0)
                 status = p.get("positionStatus", "")
-                #position_idx = int(p.get("positionIdx", 0))
-                # Hedge mode: 1=Long, 2=Short. positionIdx=0 boş satır olabilir, atla
                 if size > 0 and avg_price > 0 and status == "Normal":
-                    total += size * avg_price
-                    log.info(f"Pozisyon sayıldı: {p.get('symbol')} size={size} avgPrice={avg_price} değer={size*avg_price:.2f}")
+                    symbol = p.get("symbol")
+                    value = size * avg_price
+                    if symbol not in positions_by_symbol:
+                        positions_by_symbol[symbol] = {"long": 0.0, "short": 0.0}
+                    positions_by_symbol[symbol][direction] += value
         except Exception as e:
-            log.error(f"Toplam pozisyon sorgu hatası: {e}")
-    log.info(f"Toplam kullanılan: {total:.2f}")
-    return total
+            log.error(f"Net pozisyon sorgu hatası ({direction}): {e}")
+
+    total_net = 0.0
+    for symbol, vals in positions_by_symbol.items():
+        net = abs(vals["long"] - vals["short"])
+        total_net += net
+        log.info(f"Net pozisyon: {symbol} long={vals['long']:.2f} short={vals['short']:.2f} net={net:.2f}")
+
+    log.info(f"Toplam net kullanılan: {total_net:.2f}")
+    return total_net
 
 def set_leverage(client, symbol, leverage):
     """Kaldıraç ayarla."""
@@ -269,10 +281,10 @@ def process_signals(signals):
 
         client = client_long if direction == "Long" else client_short
 
-        # Toplam açık pozisyon kontrolü (tüm coinlerin toplamı)
-        total_used = get_total_used()
+        # Net pozisyon kontrolü — hedge pozisyonlar limiti gereksiz doldurmasın
+        total_used = get_net_used()
         if total_used + amount > total_amount:
-            reason = f"Limit aşılır (toplam {total_used:.0f}+{amount} > {total_amount})"
+            reason = f"Limit aşılır (net toplam {total_used:.0f}+{amount} > {total_amount})"
             log.info(f"{symbol} atlandı: {reason}")
             skipped.append({**sig, "reason": reason})
             continue
