@@ -215,20 +215,33 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     set_leverage(client, symbol, leverage)
 
     try:
+        # Adım 1: Market order'ı TP/SL olmadan aç
         resp = client.place_order(
             category="linear",
             symbol=symbol,
             side=side,
             orderType="Market",
             qty=str(qty),
-            stopLoss=str(sl_price),
-            takeProfit=str(tp_price),
             positionIdx=position_idx
         )
         log.info(f"İşlem açıldı: {symbol} {direction} | Miktar:{qty} | SL:{sl_price} | TP:{tp_price}")
+
+        # Adım 2: Fill sonrası TP/SL ayrıca set et
+        try:
+            time.sleep(1)  # fill için kısa bekle
+            client.set_trading_stop(
+                category="linear",
+                symbol=symbol,
+                stopLoss=str(sl_price),
+                takeProfit=str(tp_price),
+                positionIdx=position_idx
+            )
+            log.info(f"TP/SL set edildi: {symbol} | SL:{sl_price} | TP:{tp_price}")
+        except Exception as tpsl_err:
+            log.warning(f"TP/SL set hatası ({symbol}): {tpsl_err}")
+
         return True, resp
     except Exception as e:
-        #log.error(f"İşlem açma hatası ({symbol}): {e}")
         import traceback
         log.error(f"İşlem açma hatası ({symbol}): {e}")
         log.error(traceback.format_exc())
