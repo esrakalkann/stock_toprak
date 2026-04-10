@@ -252,7 +252,7 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
                     log.info(f"TP/SL bekleniyor ({attempt+1}/5): {symbol} pozisyon henüz açık değil")
             except Exception as tpsl_err:
                 log.warning(f"TP/SL set hatası ({symbol}): {tpsl_err}")
-                break
+                continue
         if not tp_sl_set:
             log.warning(f"TP/SL set edilemedi: {symbol}")
 
