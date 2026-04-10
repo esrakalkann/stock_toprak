@@ -226,19 +226,35 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
         )
         log.info(f"İşlem açıldı: {symbol} {direction} | Miktar:{qty} | SL:{sl_price} | TP:{tp_price}")
 
-        # Adım 2: Fill sonrası TP/SL ayrıca set et
-        try:
-            time.sleep(1)  # fill için kısa bekle
-            client.set_trading_stop(
-                category="linear",
-                symbol=symbol,
-                stopLoss=str(sl_price),
-                takeProfit=str(tp_price),
-                positionIdx=position_idx
-            )
-            log.info(f"TP/SL set edildi: {symbol} | SL:{sl_price} | TP:{tp_price}")
-        except Exception as tpsl_err:
-            log.warning(f"TP/SL set hatası ({symbol}): {tpsl_err}")
+        # Adım 2: Pozisyon açılana kadar bekle, sonra TP/SL set et
+        tp_sl_set = False
+        for attempt in range(5):  # max 5 deneme, 2 saniye arayla
+            time.sleep(2)
+            try:
+                pos_resp = client.get_positions(category="linear", symbol=symbol)
+                positions = pos_resp.get("result", {}).get("list", [])
+                pos_open = any(
+                    float(p.get("size", 0)) > 0 and int(p.get("positionIdx", 0)) == position_idx
+                    for p in positions
+                )
+                if pos_open:
+                    client.set_trading_stop(
+                        category="linear",
+                        symbol=symbol,
+                        stopLoss=str(sl_price),
+                        takeProfit=str(tp_price),
+                        positionIdx=position_idx
+                    )
+                    log.info(f"TP/SL set edildi: {symbol} | SL:{sl_price} | TP:{tp_price}")
+                    tp_sl_set = True
+                    break
+                else:
+                    log.info(f"TP/SL bekleniyor ({attempt+1}/5): {symbol} pozisyon henüz açık değil")
+            except Exception as tpsl_err:
+                log.warning(f"TP/SL set hatası ({symbol}): {tpsl_err}")
+                break
+        if not tp_sl_set:
+            log.warning(f"TP/SL set edilemedi: {symbol}")
 
         return True, resp
     except Exception as e:
@@ -426,6 +442,19 @@ def get_status():
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "ok"}), 200
+
+
+@app.route('/test_api', methods=['GET'])
+def test_api():
+    """Long ve short API baglantiyi test et."""
+    results = {}
+    for label, client in [("long", client_long), ("short", client_short)]:
+        try:
+            resp = client.get_wallet_balance(accountType="UNIFIED")
+            results[label] = {"status": "ok", "balance": resp["result"]["list"][0]["totalEquity"]}
+        except Exception as e:
+            results[label] = {"status": "error", "message": str(e)}
+    return jsonify(results), 200
 
 
 @app.route('/dashboard', methods=['GET'])
