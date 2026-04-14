@@ -114,10 +114,6 @@
             color: #c04b3a;
         }
         
-        .metric-value.neutral {
-            color: #1a1a1a;
-        }
-        
         .metric-sub {
             font-size: 11px;
             color: #aaa;
@@ -265,6 +261,7 @@
         .param-table-actions {
             display: flex;
             gap: 8px;
+            align-items: center;
         }
         
         .btn {
@@ -295,13 +292,29 @@
             background: #f0f0f0;
         }
         
+        .btn-add {
+            background: #fff;
+            color: #2d8f5e;
+            border-color: #2d8f5e;
+        }
+        
+        .btn-add:hover {
+            background: #f0faf5;
+        }
+        
         .param-wrap {
             background: #fff;
             border: 1px solid #e8e8e8;
             border-radius: 10px;
-            overflow: hidden;
+            overflow: auto;
             margin-bottom: 1.5rem;
-            overflow-x: auto;
+            max-height: 420px;
+        }
+        
+        .param-wrap table thead {
+            position: sticky;
+            top: 0;
+            z-index: 1;
         }
         
         .param-wrap table thead th {
@@ -309,7 +322,6 @@
             font-weight: 600;
             color: #555;
         }
-        /* Sarı başlıklar — müşterinin tablodaki sarı kolonlar */
         
         .param-wrap table thead th.yellow {
             background: #fffbe6;
@@ -321,7 +333,7 @@
         }
         
         .param-input {
-            width: 80px;
+            width: 90px;
             padding: 4px 6px;
             border: 1px solid #e8e8e8;
             border-radius: 5px;
@@ -341,9 +353,32 @@
             background: #fffbe6;
         }
         
+        .row-num {
+            font-size: 11px;
+            color: #ccc;
+            text-align: right;
+            padding-right: 8px;
+            user-select: none;
+        }
+        
+        .btn-del-row {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #ddd;
+            font-size: 14px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            line-height: 1;
+        }
+        
+        .btn-del-row:hover {
+            color: #c04b3a;
+            background: #faeaea;
+        }
+        
         .save-status {
             font-size: 12px;
-            margin-left: 8px;
             color: #888;
         }
         
@@ -353,14 +388,6 @@
         
         .save-status.err {
             color: #c04b3a;
-        }
-        
-        .row-num {
-            font-size: 11px;
-            color: #ccc;
-            text-align: right;
-            padding-right: 8px;
-            user-select: none;
         }
         
         @media (max-width: 700px) {
@@ -512,7 +539,8 @@
             <div class="section-title">parametre tablosu</div>
             <div class="param-table-actions">
                 <span class="save-status" id="save-status"></span>
-                <button class="btn btn-secondary" onclick="resetTable()">sıfırla</button>
+                <button class="btn btn-add" onclick="addRow()">+ satır ekle</button>
+                <button class="btn btn-secondary" onclick="clearTable()">temizle</button>
                 <button class="btn btn-save" onclick="saveTable()">kaydet</button>
             </div>
         </div>
@@ -527,6 +555,7 @@
                         <th>total_amount</th>
                         <th>coin_amount</th>
                         <th>amount</th>
+                        <th style="width:32px;"></th>
                     </tr>
                 </thead>
                 <tbody id="param-tbody"></tbody>
@@ -536,38 +565,70 @@
 
     <script>
         const API = '';
-        const TOTAL_ROWS = 50;
         const COLS = ['sl', 'tp', 'priority', 'total_amount', 'coin_amount', 'amount'];
         const YELLOW_COLS = ['sl', 'tp', 'priority'];
+        let rowCounter = 0;
 
         // ── Parametre tablosu ──────────────────────────────────────────────────
 
-        function buildParamTable(data) {
+        function addRow(data) {
+            rowCounter++;
             const tbody = document.getElementById('param-tbody');
-            tbody.innerHTML = '';
-            for (let i = 0; i < TOTAL_ROWS; i++) {
-                const row = data[i] || {};
-                const tr = document.createElement('tr');
-                // Satır numarası
-                const numTd = document.createElement('td');
-                numTd.className = 'row-num';
-                numTd.textContent = i + 1;
-                tr.appendChild(numTd);
+            const tr = document.createElement('tr');
+            tr.dataset.rid = rowCounter;
 
-                COLS.forEach(col => {
-                    const td = document.createElement('td');
-                    const input = document.createElement('input');
-                    input.type = 'number';
-                    input.className = 'param-input' + (YELLOW_COLS.includes(col) ? ' yellow-col' : '');
-                    input.dataset.col = col;
-                    input.dataset.row = i;
-                    input.value = row[col] !== undefined ? row[col] : '';
-                    input.placeholder = '—';
-                    input.step = col === 'priority' ? '1' : 'any';
-                    td.appendChild(input);
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
+            // Satır numarası
+            const numTd = document.createElement('td');
+            numTd.className = 'row-num';
+            numTd.textContent = tbody.children.length + 1;
+            tr.appendChild(numTd);
+
+            COLS.forEach(col => {
+                const td = document.createElement('td');
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'param-input' + (YELLOW_COLS.includes(col) ? ' yellow-col' : '');
+                input.dataset.col = col;
+                input.value = (data && data[col] !== undefined && data[col] !== null) ? data[col] : '';
+                input.placeholder = '—';
+                input.step = col === 'priority' ? '1' : 'any';
+                td.appendChild(input);
+                tr.appendChild(td);
+            });
+
+            // Sil butonu
+            const delTd = document.createElement('td');
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn-del-row';
+            delBtn.textContent = '×';
+            delBtn.title = 'Satırı sil';
+            delBtn.onclick = () => {
+                tr.remove();
+                renumberRows();
+            };
+            delTd.appendChild(delBtn);
+            tr.appendChild(delTd);
+
+            tbody.appendChild(tr);
+
+            // Otomatik scroll en alta
+            const wrap = document.querySelector('.param-wrap');
+            wrap.scrollTop = wrap.scrollHeight;
+        }
+
+        function renumberRows() {
+            const rows = document.querySelectorAll('#param-tbody tr');
+            rows.forEach((tr, i) => {
+                const numTd = tr.querySelector('.row-num');
+                if (numTd) numTd.textContent = i + 1;
+            });
+        }
+
+        function buildParamTable(data) {
+            document.getElementById('param-tbody').innerHTML = '';
+            rowCounter = 0;
+            if (data && data.length > 0) {
+                data.forEach(row => addRow(row));
             }
         }
 
@@ -587,13 +648,11 @@
             statusEl.className = 'save-status';
 
             const rows = [];
-            const inputs = document.querySelectorAll('#param-tbody tr');
-            inputs.forEach(tr => {
+            document.querySelectorAll('#param-tbody tr').forEach(tr => {
                 const rowData = {};
                 tr.querySelectorAll('input').forEach(inp => {
                     rowData[inp.dataset.col] = inp.value !== '' ? parseFloat(inp.value) : null;
                 });
-                // En az bir sütun dolu ise ekle
                 if (COLS.some(c => rowData[c] !== null && rowData[c] !== undefined)) {
                     rows.push(rowData);
                 }
@@ -624,8 +683,8 @@
             }, 4000);
         }
 
-        function resetTable() {
-            if (confirm('Tabloyu sıfırlamak istediğinizden emin misiniz?')) {
+        function clearTable() {
+            if (confirm('Tabloyu temizlemek istediğinizden emin misiniz?')) {
                 buildParamTable([]);
             }
         }
@@ -698,43 +757,39 @@
                 document.getElementById('long-open-count').textContent = longPos.length;
                 document.getElementById('short-open-count').textContent = shortPos.length;
                 document.getElementById('last-update').textContent = timeSince(data.timestamp);
-                document.getElementById('last-signal-time').textContent = data.timestamp ? 'son sinyal: ' + formatTs(data.timestamp) : '';
+                document.getElementById('last-signal-time').textContent = data.timestamp ?
+                    'son sinyal: ' + formatTs(data.timestamp) : '';
 
                 renderPositions(longPos, 'long-positions-table');
                 renderPositions(shortPos, 'short-positions-table');
 
                 const ptbody = document.getElementById('processed-table');
-                if (processed.length === 0) {
-                    ptbody.innerHTML = '<tr><td colspan="9" class="empty">henüz sinyal işlenmedi</td></tr>';
-                } else {
-                    ptbody.innerHTML = processed.map(s => `
-                        <tr>
-                            <td><strong>${s.symbol}</strong></td>
-                            <td><span class="badge ${s.direction==='Long'?'long':'short'}">${s.direction}</span></td>
-                            <td>${s.price}</td>
-                            <td>$${s.amount}</td>
-                            <td>${s.leverage}x</td>
-                            <td style="color:#c04b3a;">${s.sl_price||'—'}</td>
-                            <td style="color:#2d8f5e;">${s.tp_price||'—'}</td>
-                            <td>${s.priority}</td>
-                            <td>$${s.total_amount}</td>
-                        </tr>`).join('');
-                }
+                ptbody.innerHTML = processed.length === 0 ?
+                    '<tr><td colspan="9" class="empty">henüz sinyal işlenmedi</td></tr>' :
+                    processed.map(s => `<tr>
+                        <td><strong>${s.symbol}</strong></td>
+                        <td><span class="badge ${s.direction==='Long'?'long':'short'}">${s.direction}</span></td>
+                        <td>${s.price}</td>
+                        <td>$${s.amount}</td>
+                        <td>${s.leverage}x</td>
+                        <td style="color:#c04b3a;">${s.sl_price||'—'}</td>
+                        <td style="color:#2d8f5e;">${s.tp_price||'—'}</td>
+                        <td>${s.priority}</td>
+                        <td>$${s.total_amount}</td>
+                    </tr>`).join('');
 
                 const stbody = document.getElementById('skipped-table');
-                if (skipped.length === 0) {
-                    stbody.innerHTML = '<tr><td colspan="6" class="empty">atlanan sinyal yok</td></tr>';
-                } else {
-                    stbody.innerHTML = skipped.map(s => `
-                        <tr>
-                            <td><strong>${s.symbol}</strong></td>
-                            <td><span class="badge ${s.direction==='Long'?'long':'short'}">${s.direction}</span></td>
-                            <td>${s.price}</td>
-                            <td>$${s.amount || '—'}</td>
-                            <td>$${s.total_amount || '—'}</td>
-                            <td style="color:#c04b3a;">${s.reason||'—'}</td>
-                        </tr>`).join('');
-                }
+                stbody.innerHTML = skipped.length === 0 ?
+                    '<tr><td colspan="6" class="empty">atlanan sinyal yok</td></tr>' :
+                    skipped.map(s => `<tr>
+                        <td><strong>${s.symbol}</strong></td>
+                        <td><span class="badge ${s.direction==='Long'?'long':'short'}">${s.direction}</span></td>
+                        <td>${s.price}</td>
+                        <td>$${s.amount || '—'}</td>
+                        <td>$${s.total_amount || '—'}</td>
+                        <td style="color:#c04b3a;">${s.reason||'—'}</td>
+                    </tr>`).join('');
+
             } catch (e) {
                 connText.textContent = 'sunucuya ulaşılamıyor';
                 connText.className = 'conn-err';
