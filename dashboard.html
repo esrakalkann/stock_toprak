@@ -249,6 +249,119 @@
             gap: 12px;
             margin-bottom: 1.5rem;
         }
+        /* ── Parametre tablosu ── */
+        
+        .param-table-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .param-table-header .section-title {
+            margin-bottom: 0;
+        }
+        
+        .param-table-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn {
+            font-size: 12px;
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1px solid #e0e0e0;
+            font-family: inherit;
+        }
+        
+        .btn-save {
+            background: #2d8f5e;
+            color: #fff;
+            border-color: #2d8f5e;
+        }
+        
+        .btn-save:hover {
+            background: #237a4f;
+        }
+        
+        .btn-secondary {
+            background: #fff;
+            color: #555;
+        }
+        
+        .btn-secondary:hover {
+            background: #f0f0f0;
+        }
+        
+        .param-wrap {
+            background: #fff;
+            border: 1px solid #e8e8e8;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+        }
+        
+        .param-wrap table thead th {
+            background: #fafafa;
+            font-weight: 600;
+            color: #555;
+        }
+        /* Sarı başlıklar — müşterinin tablodaki sarı kolonlar */
+        
+        .param-wrap table thead th.yellow {
+            background: #fffbe6;
+            color: #7a5c00;
+        }
+        
+        .param-wrap table tbody td {
+            padding: 4px 6px;
+        }
+        
+        .param-input {
+            width: 80px;
+            padding: 4px 6px;
+            border: 1px solid #e8e8e8;
+            border-radius: 5px;
+            font-size: 12px;
+            font-family: inherit;
+            color: #1a1a1a;
+            background: #fff;
+            text-align: right;
+        }
+        
+        .param-input:focus {
+            outline: none;
+            border-color: #aaa;
+        }
+        
+        .param-input.yellow-col {
+            background: #fffbe6;
+        }
+        
+        .save-status {
+            font-size: 12px;
+            margin-left: 8px;
+            color: #888;
+        }
+        
+        .save-status.ok {
+            color: #2d8f5e;
+        }
+        
+        .save-status.err {
+            color: #c04b3a;
+        }
+        
+        .row-num {
+            font-size: 11px;
+            color: #ccc;
+            text-align: right;
+            padding-right: 8px;
+            user-select: none;
+        }
         
         @media (max-width: 700px) {
             .metric-grid {
@@ -393,10 +506,131 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- ── Parametre Tablosu ── -->
+        <div class="param-table-header">
+            <div class="section-title">parametre tablosu</div>
+            <div class="param-table-actions">
+                <span class="save-status" id="save-status"></span>
+                <button class="btn btn-secondary" onclick="resetTable()">sıfırla</button>
+                <button class="btn btn-save" onclick="saveTable()">kaydet</button>
+            </div>
+        </div>
+        <div class="param-wrap">
+            <table id="param-table">
+                <thead>
+                    <tr>
+                        <th style="width:32px;"></th>
+                        <th class="yellow">sl</th>
+                        <th class="yellow">tp</th>
+                        <th class="yellow">priority</th>
+                        <th>total_amount</th>
+                        <th>coin_amount</th>
+                        <th>amount</th>
+                    </tr>
+                </thead>
+                <tbody id="param-tbody"></tbody>
+            </table>
+        </div>
     </div>
 
     <script>
         const API = '';
+        const TOTAL_ROWS = 50;
+        const COLS = ['sl', 'tp', 'priority', 'total_amount', 'coin_amount', 'amount'];
+        const YELLOW_COLS = ['sl', 'tp', 'priority'];
+
+        // ── Parametre tablosu ──────────────────────────────────────────────────
+
+        function buildParamTable(data) {
+            const tbody = document.getElementById('param-tbody');
+            tbody.innerHTML = '';
+            for (let i = 0; i < TOTAL_ROWS; i++) {
+                const row = data[i] || {};
+                const tr = document.createElement('tr');
+                // Satır numarası
+                const numTd = document.createElement('td');
+                numTd.className = 'row-num';
+                numTd.textContent = i + 1;
+                tr.appendChild(numTd);
+
+                COLS.forEach(col => {
+                    const td = document.createElement('td');
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.className = 'param-input' + (YELLOW_COLS.includes(col) ? ' yellow-col' : '');
+                    input.dataset.col = col;
+                    input.dataset.row = i;
+                    input.value = row[col] !== undefined ? row[col] : '';
+                    input.placeholder = '—';
+                    input.step = col === 'priority' ? '1' : 'any';
+                    td.appendChild(input);
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            }
+        }
+
+        async function loadTable() {
+            try {
+                const res = await fetch(API + '/table');
+                const data = await res.json();
+                buildParamTable(data);
+            } catch (e) {
+                buildParamTable([]);
+            }
+        }
+
+        async function saveTable() {
+            const statusEl = document.getElementById('save-status');
+            statusEl.textContent = 'kaydediliyor...';
+            statusEl.className = 'save-status';
+
+            const rows = [];
+            const inputs = document.querySelectorAll('#param-tbody tr');
+            inputs.forEach(tr => {
+                const rowData = {};
+                tr.querySelectorAll('input').forEach(inp => {
+                    rowData[inp.dataset.col] = inp.value !== '' ? parseFloat(inp.value) : null;
+                });
+                // En az bir sütun dolu ise ekle
+                if (COLS.some(c => rowData[c] !== null && rowData[c] !== undefined)) {
+                    rows.push(rowData);
+                }
+            });
+
+            try {
+                const res = await fetch(API + '/table', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(rows)
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    statusEl.textContent = '✓ ' + result.message;
+                    statusEl.className = 'save-status ok';
+                } else {
+                    statusEl.textContent = '✗ ' + (result.error || 'hata');
+                    statusEl.className = 'save-status err';
+                }
+            } catch (e) {
+                statusEl.textContent = '✗ sunucuya ulaşılamadı';
+                statusEl.className = 'save-status err';
+            }
+            setTimeout(() => {
+                statusEl.textContent = '';
+            }, 4000);
+        }
+
+        function resetTable() {
+            if (confirm('Tabloyu sıfırlamak istediğinizden emin misiniz?')) {
+                buildParamTable([]);
+            }
+        }
+
+        // ── Pozisyonlar ────────────────────────────────────────────────────────
 
         function formatTs(ts) {
             if (!ts) return '—';
@@ -426,13 +660,13 @@
                 const pnlClass = pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
                 const pnlStr = (pnl >= 0 ? '+' : '') + pnl.toFixed(4);
                 return `<tr>
-      <td><strong>${p.symbol}</strong></td>
-      <td>${p.size}</td>
-      <td>${p.avg_price}</td>
-      <td style="color:#c04b3a;">${p.sl || '—'}</td>
-      <td style="color:#2d8f5e;">${p.tp || '—'}</td>
-      <td class="${pnlClass}">${pnlStr}</td>
-    </tr>`;
+                    <td><strong>${p.symbol}</strong></td>
+                    <td>${p.size}</td>
+                    <td>${p.avg_price}</td>
+                    <td style="color:#c04b3a;">${p.sl || '—'}</td>
+                    <td style="color:#2d8f5e;">${p.tp || '—'}</td>
+                    <td class="${pnlClass}">${pnlStr}</td>
+                </tr>`;
             }).join('');
         }
 
@@ -474,17 +708,17 @@
                     ptbody.innerHTML = '<tr><td colspan="9" class="empty">henüz sinyal işlenmedi</td></tr>';
                 } else {
                     ptbody.innerHTML = processed.map(s => `
-        <tr>
-          <td><strong>${s.symbol}</strong></td>
-          <td><span class="badge ${s.direction==='Long'?'long':'short'}">${s.direction}</span></td>
-          <td>${s.price}</td>
-          <td>$${s.amount}</td>
-          <td>${s.leverage}x</td>
-          <td style="color:#c04b3a;">${s.sl_price||'—'}</td>
-          <td style="color:#2d8f5e;">${s.tp_price||'—'}</td>
-          <td>${s.priority}</td>
-          <td>$${s.total_amount}</td>
-        </tr>`).join('');
+                        <tr>
+                            <td><strong>${s.symbol}</strong></td>
+                            <td><span class="badge ${s.direction==='Long'?'long':'short'}">${s.direction}</span></td>
+                            <td>${s.price}</td>
+                            <td>$${s.amount}</td>
+                            <td>${s.leverage}x</td>
+                            <td style="color:#c04b3a;">${s.sl_price||'—'}</td>
+                            <td style="color:#2d8f5e;">${s.tp_price||'—'}</td>
+                            <td>${s.priority}</td>
+                            <td>$${s.total_amount}</td>
+                        </tr>`).join('');
                 }
 
                 const stbody = document.getElementById('skipped-table');
@@ -492,14 +726,14 @@
                     stbody.innerHTML = '<tr><td colspan="6" class="empty">atlanan sinyal yok</td></tr>';
                 } else {
                     stbody.innerHTML = skipped.map(s => `
-        <tr>
-          <td><strong>${s.symbol}</strong></td>
-          <td><span class="badge ${s.direction==='Long'?'long':'short'}">${s.direction}</span></td>
-          <td>${s.price}</td>
-          <td>$${s.amount}</td>
-          <td>$${s.total_amount}</td>
-          <td style="color:#c04b3a;">${s.reason||'—'}</td>
-        </tr>`).join('');
+                        <tr>
+                            <td><strong>${s.symbol}</strong></td>
+                            <td><span class="badge ${s.direction==='Long'?'long':'short'}">${s.direction}</span></td>
+                            <td>${s.price}</td>
+                            <td>$${s.amount || '—'}</td>
+                            <td>$${s.total_amount || '—'}</td>
+                            <td style="color:#c04b3a;">${s.reason||'—'}</td>
+                        </tr>`).join('');
                 }
             } catch (e) {
                 connText.textContent = 'sunucuya ulaşılamıyor';
@@ -508,7 +742,9 @@
             }
         }
 
+        // ── Başlat ─────────────────────────────────────────────────────────────
         fetchData();
+        loadTable();
         setInterval(fetchData, 30000);
     </script>
 </body>

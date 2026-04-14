@@ -1,10 +1,11 @@
 import threading
 import logging
 import time
+import json
+import os
 from datetime import datetime
 
 from dotenv import load_dotenv
-import os
 load_dotenv()
 
 from flask import Flask, request, jsonify, abort, send_file
@@ -35,19 +36,45 @@ BYBIT_SHORT_API_SECRET = os.getenv("BYBIT_SHORT_API_SECRET")
 client_long  = HTTP(testnet=True, api_key=BYBIT_LONG_API_KEY,  api_secret=BYBIT_LONG_API_SECRET)
 client_short = HTTP(testnet=True, api_key=BYBIT_SHORT_API_KEY, api_secret=BYBIT_SHORT_API_SECRET)
 
+# ── Tablo — Railway Volume ─────────────────────────────────────────────────────
+TABLE_PATH = "/data/table.json"
+
+def load_table():
+    try:
+        with open(TABLE_PATH, "r") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_table(data):
+    os.makedirs("/data", exist_ok=True)
+    with open(TABLE_PATH, "w") as f:
+        json.dump(data, f, indent=2)
+
+def lookup_table(sl, tp, priority):
+    """sl+tp+priority kombinasyonuyla tabloda eşleşen satırı döner. Bulamazsa None."""
+    table = load_table()
+    for row in table:
+        try:
+            if (float(row.get("sl", -1)) == float(sl) and
+                float(row.get("tp", -1)) == float(tp) and
+                int(row.get("priority", -1)) == int(priority)):
+                return row
+        except Exception:
+            continue
+    return None
+
 # ── Global state ───────────────────────────────────────────────────────────────
 state_lock   = threading.Lock()
 
-# Bekleyen sinyaller — her 4 saatlik kapanışta birikir, sonra işleme alınır
 pending_signals = []
 last_process_time = 0
-BATCH_WINDOW = 30  # saniye — bu süre içinde gelen sinyaller birlikte işlenir
+BATCH_WINDOW = 30  # saniye
 
-# Dashboard için son durum
 last_status = {
     "timestamp": None,
-    "processed": [],   # işleme alınan sinyaller
-    "skipped": [],     # atlanan sinyaller (neden atlandığı ile)
+    "processed": [],
+    "skipped": [],
     "open_positions": []
 }
 
@@ -67,7 +94,6 @@ def get_open_positions(client, symbol):
                 count += 1
                 total_used += size * avg_price
         log.info(f"{symbol} pozisyon sorgusu → toplam kullanılan: {total_used}")
-        log.info(f"Pozisyon detay: size={p.get('size')} avgPrice={p.get('avgPrice')} symbol={p.get('symbol')}")
         return count, total_used
     except Exception as e:
         log.error(f"Pozisyon sorgu hatası ({symbol}): {e}")
@@ -78,7 +104,7 @@ def get_all_positions(client):
     try:
         resp = client.get_positions(category="linear", settleCoin="USDT")
         positions = resp.get("result", {}).get("list", [])
-        log.info(f"Ham pozisyon listesi: {positions}")  # buraya taşı
+        log.info(f"Ham pozisyon listesi: {positions}")
         result = []
         for p in positions:
             size = float(p.get("size", 0))
@@ -96,44 +122,50 @@ def get_all_positions(client):
     except Exception as e:
         log.error(f"Pozisyon listesi hatası: {e}")
         return []
-    
-def get_net_used():
+
+def get_used_for_direction(direction):
     """
-    Her coin için net pozisyon değerini hesaplar.
-    Net = |Long değeri - Short değeri|
-    Toplam = tüm coinlerin net değerlerinin toplamı.
-    Hedge pozisyonlar limiti gereksiz doldurmaz.
+    Long veya Short hesabındaki toplam açık pozisyon değerini döner.
+    Netleştirme yapılmaz — her pozisyon brüt olarak sayılır.
     """
-    positions_by_symbol = {}  # symbol -> {"long": 0.0, "short": 0.0}
+    client = client_long if direction == "Long" else client_short
+    bybit_side = "Buy" if direction == "Long" else "Sell"
+    try:
+        resp = client.get_positions(category="linear", settleCoin="USDT")
+        positions = resp.get("result", {}).get("list", [])
+        total = 0.0
+        for p in positions:
+            size = float(p.get("size", 0))
+            avg_price = float(p.get("avgPrice", 0) or 0)
+            status = p.get("positionStatus", "")
+            side = p.get("side", "")
+            if size > 0 and avg_price > 0 and status == "Normal" and side == bybit_side:
+                total += size * avg_price
+        log.info(f"{direction} toplam kullanılan: {total:.2f}")
+        return total
+    except Exception as e:
+        log.error(f"Kullanım sorgu hatası ({direction}): {e}")
+        return 0.0
 
-    for client, direction in [(client_long, "long"), (client_short, "short")]:
-        try:
-            resp = client.get_positions(category="linear", settleCoin="USDT")
-            positions = resp.get("result", {}).get("list", [])
-            for p in positions:
-                size = float(p.get("size", 0))
-                avg_price = float(p.get("avgPrice", 0) or 0)
-                status = p.get("positionStatus", "")
-                if size > 0 and avg_price > 0 and status == "Normal":
-                    symbol = p.get("symbol")
-                    value = size * avg_price
-                    if symbol not in positions_by_symbol:
-                        positions_by_symbol[symbol] = {"long": 0.0, "short": 0.0}
-                    positions_by_symbol[symbol][direction] += value
-        except Exception as e:
-            log.error(f"Net pozisyon sorgu hatası ({direction}): {e}")
-
-    total_net = 0.0
-    for symbol, vals in positions_by_symbol.items():
-        net = abs(vals["long"] - vals["short"])
-        total_net += net
-        log.info(f"Net pozisyon: {symbol} long={vals['long']:.2f} short={vals['short']:.2f} net={net:.2f}")
-
-    log.info(f"Toplam net kullanılan: {total_net:.2f}")
-    return total_net
+def get_coin_used(client, symbol, direction):
+    """Belirli bir coin için o yöndeki açık pozisyon değerini döner."""
+    bybit_side = "Buy" if direction == "Long" else "Sell"
+    try:
+        resp = client.get_positions(category="linear", symbol=symbol)
+        positions = resp.get("result", {}).get("list", [])
+        total = 0.0
+        for p in positions:
+            size = float(p.get("size", 0))
+            avg_price = float(p.get("avgPrice", 0) or 0)
+            if size > 0 and avg_price > 0 and p.get("side") == bybit_side:
+                total += size * avg_price
+        log.info(f"{symbol} {direction} coin kullanılan: {total:.2f}")
+        return total
+    except Exception as e:
+        log.error(f"Coin kullanım sorgu hatası ({symbol}): {e}")
+        return 0.0
 
 def set_leverage(client, symbol, leverage):
-    """Kaldıraç ayarla."""
     try:
         client.set_leverage(
             category="linear",
@@ -165,15 +197,10 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     """
     Bybit'te işlem aç.
     amount  = dolar cinsinden tutar
-    price   = giriş fiyatı
     sl_pct  = stop loss yüzdesi
     tp_pct  = take profit yüzdesi
     """
-    # Sembol 1000 ile başlıyorsa fiyatı 1000 ile çarp
-    #if symbol.startswith("1000"):
-     #   price = price * 1000
-
-     # Bybit'ten anlık fiyatı çek
+    # Bybit'ten anlık fiyatı çek
     ticker = client.get_tickers(category="linear", symbol=symbol)
     if not ticker["result"]["list"]:
         log.error(f"{symbol}: Bybit'te bulunamadı, işlem atlandı")
@@ -192,9 +219,7 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     except Exception as e:
         log.warning(f"Max kaldıraç sorgu hatası ({symbol}): {e}")
 
-
     side = "Buy" if direction == "Long" else "Sell"
-    # Hedge Mode: Long=1, Short=2
     position_idx = 1 if direction == "Long" else 2
 
     step, min_qty = get_qty_step(client, symbol)
@@ -202,20 +227,19 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     if qty < min_qty:
         qty = min_qty
 
-    # SL ve TP fiyatları
     if direction == "Long":
         sl_price = round(price * (1 - sl_pct / 100), 6)
         tp_price = round(price * (1 + tp_pct / 100), 6)
     else:
         sl_price = round(price * (1 + sl_pct / 100), 6)
         tp_price = round(price * (1 - tp_pct / 100), 6)
-    
+
     log.info(f"Bybit fiyatı: {price} | SL: {sl_price} | TP: {tp_price} | Yön: {direction} | positionIdx: {position_idx}")
 
     set_leverage(client, symbol, leverage)
 
     try:
-        # Adım 1: Market order'ı TP/SL olmadan aç
+        # Adım 1: Market order aç
         resp = client.place_order(
             category="linear",
             symbol=symbol,
@@ -251,10 +275,26 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
                 else:
                     log.info(f"TP/SL bekleniyor ({attempt+1}/5): {symbol} pozisyon henüz açık değil")
             except Exception as tpsl_err:
-                log.warning(f"TP/SL set hatası ({symbol}): {tpsl_err}")
-                continue
+                log.warning(f"TP/SL set hatası deneme {attempt+1}/5 ({symbol}): {tpsl_err}")
+                continue  # geçici hatalarda kalan denemeleri kullan
+
         if not tp_sl_set:
-            log.warning(f"TP/SL set edilemedi: {symbol}")
+            # Pozisyon gerçekten açılmadıysa emir iptal olmuştur
+            try:
+                check_resp = client.get_positions(category="linear", symbol=symbol)
+                check_positions = check_resp.get("result", {}).get("list", [])
+                still_open = any(
+                    float(p.get("size", 0)) > 0 and int(p.get("positionIdx", 0)) == position_idx
+                    for p in check_positions
+                )
+            except Exception:
+                still_open = False
+
+            if not still_open:
+                log.warning(f"Emir iptal oldu, pozisyon açılmadı: {symbol}")
+                return False, "Emir iptal oldu (pozisyon açılmadı)"
+            else:
+                log.warning(f"TP/SL set edilemedi ama pozisyon açık: {symbol}")
 
         return True, resp
     except Exception as e:
@@ -292,9 +332,25 @@ def process_signals(signals):
             else:
                 log.info(f"{sym}: Öncelik {sig['priority']} <= {existing['priority']}, atlandı")
 
+    # Tablo lookup — sl+tp+priority ile total_amount, coin_amount, amount bul
+    enriched = []
+    for sig in deduped.values():
+        row = lookup_table(sig["sl"], sig["tp"], sig["priority"])
+        if row is None:
+            reason = f"Tabloda eşleşme bulunamadı (sl={sig['sl']} tp={sig['tp']} priority={sig['priority']})"
+            log.info(f"{sig['symbol']} atlandı: {reason}")
+            skipped.append({**sig, "total_amount": 0, "coin_amount": 0, "amount": 0, "reason": reason})
+            continue
+        enriched.append({
+            **sig,
+            "total_amount": float(row["total_amount"]),
+            "coin_amount":  float(row["coin_amount"]),
+            "amount":       float(row["amount"]),
+        })
+
     # Sırala: total_amount büyük → fiyat küçük
     sorted_signals = sorted(
-        deduped.values(),
+        enriched,
         key=lambda s: (-s["total_amount"], s["price"])
     )
 
@@ -307,13 +363,22 @@ def process_signals(signals):
         sl_pct       = sig["sl"]
         tp_pct       = sig["tp"]
         total_amount = sig["total_amount"]
+        coin_amount  = sig["coin_amount"]
 
         client = client_long if direction == "Long" else client_short
 
-        # Net pozisyon kontrolü — hedge pozisyonlar limiti gereksiz doldurmasın
-        total_used = get_net_used()
+        # Toplam limit kontrolü — yön bazlı brüt, netleştirme yok
+        total_used = get_used_for_direction(direction)
         if total_used + amount > total_amount:
-            reason = f"Limit aşılır (net toplam {total_used:.0f}+{amount} > {total_amount})"
+            reason = f"Toplam limit aşılır ({direction} {total_used:.0f}+{amount} > {total_amount})"
+            log.info(f"{symbol} atlandı: {reason}")
+            skipped.append({**sig, "reason": reason})
+            continue
+
+        # Coin bazlı limit kontrolü
+        coin_used = get_coin_used(client, symbol, direction)
+        if coin_used + amount > coin_amount:
+            reason = f"Coin limiti aşılır ({symbol} {direction} {coin_used:.0f}+{amount} > {coin_amount})"
             log.info(f"{symbol} atlandı: {reason}")
             skipped.append({**sig, "reason": reason})
             continue
@@ -326,9 +391,13 @@ def process_signals(signals):
             log.error(f"{symbol} işlem hatası: {e}")
             log.error(traceback.format_exc())
             success, resp = False, str(e)
+
         if success:
-            processed.append({**sig, "sl_price": round(price*(1-sl_pct/100),6) if direction=="Long" else round(price*(1+sl_pct/100),6),
-                               "tp_price": round(price*(1+tp_pct/100),6) if direction=="Long" else round(price*(1-tp_pct/100),6)})
+            processed.append({
+                **sig,
+                "sl_price": round(price*(1-sl_pct/100), 6) if direction == "Long" else round(price*(1+sl_pct/100), 6),
+                "tp_price": round(price*(1+tp_pct/100), 6) if direction == "Long" else round(price*(1-tp_pct/100), 6)
+            })
         else:
             skipped.append({**sig, "reason": str(resp)})
 
@@ -340,7 +409,6 @@ def process_signals(signals):
 @app.before_request
 def limit_remote_addr():
     # TEST MODU: IP kontrolü kapalı.
-    # Production'a geçince aşağıdaki satırların başındaki # kaldır:
     # trusted_ips = ["52.89.214.238","34.212.75.30","54.218.53.128","52.32.178.7"]
     # if request.remote_addr not in trusted_ips:
     #     abort(403)
@@ -355,16 +423,15 @@ def receive_signal():
     TradingView'den gelen sinyal.
     Beklenen format:
     {
-        "symbol": "LUNC",
-        "price": "0.01020200",
+        "symbol": "1000LUNCUSDT",
+        "price": "{{close}}",
         "direction": "Long",
         "priority": 2,
-        "total_amount": 1000,
-        "amount": 100,
         "leverage": 25,
         "sl": 16,
         "tp": 8
     }
+    total_amount, coin_amount, amount tablodan alınır.
     """
     global pending_signals, last_status, last_process_time
 
@@ -375,23 +442,21 @@ def receive_signal():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-    required = ["symbol", "price", "direction", "priority", "total_amount", "amount", "leverage", "sl", "tp"]
+    required = ["symbol", "price", "direction", "priority", "leverage", "sl", "tp"]
     for field in required:
         if field not in data:
             return jsonify({"error": f"{field} alanı eksik"}), 400
 
     try:
         signal = {
-            "symbol":       data["symbol"],
-            "price":        float(data["price"]),
-            "direction":    data["direction"],
-            "priority":     int(data["priority"]),
-            "total_amount": float(data["total_amount"]),
-            "amount":       float(data["amount"]),
-            "leverage":     int(data["leverage"]),
-            "sl":           float(data["sl"]),
-            "tp":           float(data["tp"]),
-            "timestamp":    datetime.utcnow().isoformat()
+            "symbol":    data["symbol"],
+            "price":     float(data["price"]),
+            "direction": data["direction"],
+            "priority":  int(data["priority"]),
+            "leverage":  int(data["leverage"]),
+            "sl":        float(data["sl"]),
+            "tp":        float(data["tp"]),
+            "timestamp": datetime.utcnow().isoformat()
         }
     except (TypeError, ValueError) as e:
         return jsonify({"error": f"Geçersiz değer: {e}"}), 400
@@ -403,7 +468,7 @@ def receive_signal():
 
     with state_lock:
         pending_signals.append(signal)
-        
+
         now = time.time()
         if now - last_process_time >= BATCH_WINDOW:
             last_process_time = now
@@ -426,6 +491,38 @@ def receive_signal():
     }), 200
 
 
+# ── Tablo endpoint'leri ────────────────────────────────────────────────────────
+
+@app.route('/table', methods=['GET'])
+def get_table():
+    return jsonify(load_table()), 200
+
+@app.route('/table', methods=['POST'])
+def set_table():
+    try:
+        data = request.get_json(force=True)
+        if not isinstance(data, list):
+            return jsonify({"error": "Liste bekleniyor"}), 400
+        cleaned = []
+        for row in data:
+            # En az bir alan doluysa satırı kaydet
+            vals = [row.get(k) for k in ["sl", "tp", "priority", "total_amount", "coin_amount", "amount"]]
+            if any(v not in (None, "", 0, "0") for v in vals):
+                cleaned.append({
+                    "sl":           float(row.get("sl") or 0),
+                    "tp":           float(row.get("tp") or 0),
+                    "priority":     int(row.get("priority") or 0),
+                    "total_amount": float(row.get("total_amount") or 0),
+                    "coin_amount":  float(row.get("coin_amount") or 0),
+                    "amount":       float(row.get("amount") or 0),
+                })
+        save_table(cleaned)
+        log.info(f"Tablo güncellendi: {len(cleaned)} satır kaydedildi")
+        return jsonify({"message": f"{len(cleaned)} satır kaydedildi"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 # ── Dashboard endpoint'leri ────────────────────────────────────────────────────
 
 @app.route('/status', methods=['GET'])
@@ -446,7 +543,7 @@ def health():
 
 @app.route('/test_api', methods=['GET'])
 def test_api():
-    """Long ve short API baglantiyi test et."""
+    """Long ve short API bağlantıyı test et."""
     results = {}
     for label, client in [("long", client_long), ("short", client_short)]:
         try:
