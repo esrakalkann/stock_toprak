@@ -467,22 +467,14 @@ def receive_signal():
     log.info(f"Sinyal alındı: {signal['symbol']} {signal['direction']} | Fiyat:{signal['price']} | Öncelik:{signal['priority']}")
 
     with state_lock:
-        pending_signals.append(signal)
+        processed, skipped = process_signals([signal])
 
-        now = time.time()
-        if now - last_process_time >= BATCH_WINDOW:
-            last_process_time = now
-            processed, skipped = process_signals(pending_signals)
-            pending_signals = []
-
-            last_status = {
-                "timestamp": datetime.utcnow().isoformat(),
-                "processed": processed,
-                "skipped": skipped,
-                "open_positions": []
-            }
-        else:
-            processed, skipped = [], []
+        last_status = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "processed": processed,
+            "skipped": skipped,
+            "open_positions": []
+        }
 
     return jsonify({
         "message": "Sinyal işlendi",
