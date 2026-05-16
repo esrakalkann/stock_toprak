@@ -223,7 +223,9 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     position_idx = 1 if direction == "Long" else 2
 
     step, min_qty = get_qty_step(client, symbol)
-    qty = round_qty(amount / price, step)
+# amount = marjin (yatırılan para). Pozisyon büyüklüğü = amount × leverage
+    position_value = amount * leverage
+    qty = round_qty(position_value / price, step)
     if qty < min_qty:
         qty = min_qty
 
@@ -367,18 +369,22 @@ def process_signals(signals):
 
         client = client_long if direction == "Long" else client_short
 
+        # amount = marjin, gerçek pozisyon büyüklüğü = amount × leverage
+        position_value = amount * leverage
+
         # Toplam limit kontrolü — yön bazlı brüt, netleştirme yok
+        # total_amount = toplam pozisyon büyüklüğü limiti (value)
         total_used = get_used_for_direction(direction)
-        if total_used + amount > total_amount:
-            reason = f"Toplam limit aşılır ({direction} {total_used:.0f}+{amount} > {total_amount})"
+        if total_used + position_value > total_amount:
+            reason = f"Toplam limit aşılır ({direction} value {total_used:.0f}+{position_value:.0f} > {total_amount})"
             log.info(f"{symbol} atlandı: {reason}")
             skipped.append({**sig, "reason": reason})
             continue
 
-        # Coin bazlı limit kontrolü
+        # Coin bazlı limit kontrolü — coin_amount = toplam pozisyon büyüklüğü (value)
         coin_used = get_coin_used(client, symbol, direction)
-        if coin_used + amount > coin_amount:
-            reason = f"Coin limiti aşılır ({symbol} {direction} {coin_used:.0f}+{amount} > {coin_amount})"
+        if coin_used + position_value > coin_amount:
+            reason = f"Coin limiti aşılır ({symbol} {direction} value {coin_used:.0f}+{position_value:.0f} > {coin_amount})"
             log.info(f"{symbol} atlandı: {reason}")
             skipped.append({**sig, "reason": reason})
             continue
