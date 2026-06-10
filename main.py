@@ -198,16 +198,20 @@ def round_qty(qty, step):
 def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_pct):
     """
     Bybit'te işlem aç.
-    amount  = dolar cinsinden tutar
+    amount  = dolar cinsinden tutar (marjin)
+    price   = alarm fiyatı (TP/SL hesabında kullanılır)
     sl_pct  = stop loss yüzdesi
     tp_pct  = take profit yüzdesi
     """
-    # Bybit'ten anlık fiyatı çek
+    # Alarm fiyatı — TP/SL hesabında kullanılır
+    signal_price = price
+
+    # Bybit'ten anlık fiyat — qty hesabında kullanılır
     ticker = client.get_tickers(category="linear", symbol=symbol)
     if not ticker["result"]["list"]:
         log.error(f"{symbol}: Bybit'te bulunamadı, işlem atlandı")
         return False, "Sembol bulunamadı"
-    price = float(ticker["result"]["list"][0]["lastPrice"])
+    market_price = float(ticker["result"]["list"][0]["lastPrice"])
 
     # Max kaldıraç kontrolü
     try:
@@ -225,20 +229,21 @@ def place_order(client, symbol, direction, amount, price, leverage, sl_pct, tp_p
     position_idx = 1 if direction == "Long" else 2
 
     step, min_qty = get_qty_step(client, symbol)
-# amount = marjin (yatırılan para). Pozisyon büyüklüğü = amount × leverage
+    # amount = marjin (yatırılan para). Pozisyon büyüklüğü = amount × leverage
     position_value = amount * leverage
-    qty = round_qty(position_value / price, step)
+    qty = round_qty(position_value / market_price, step)
     if qty < min_qty:
         qty = min_qty
 
+    # TP/SL alarm fiyatından hesaplanır
     if direction == "Long":
-        sl_price = round(price * (1 - sl_pct / 100), 6)
-        tp_price = round(price * (1 + tp_pct / 100), 6)
+        sl_price = round(signal_price * (1 - sl_pct / 100), 6)
+        tp_price = round(signal_price * (1 + tp_pct / 100), 6)
     else:
-        sl_price = round(price * (1 + sl_pct / 100), 6)
-        tp_price = round(price * (1 - tp_pct / 100), 6)
+        sl_price = round(signal_price * (1 + sl_pct / 100), 6)
+        tp_price = round(signal_price * (1 - tp_pct / 100), 6)
 
-    log.info(f"Bybit fiyatı: {price} | SL: {sl_price} | TP: {tp_price} | Yön: {direction} | positionIdx: {position_idx}")
+    log.info(f"Alarm fiyatı: {signal_price} | Bybit fiyatı: {market_price} | SL: {sl_price} | TP: {tp_price} | Yön: {direction} | positionIdx: {position_idx}")
 
     set_leverage(client, symbol, leverage)
 
