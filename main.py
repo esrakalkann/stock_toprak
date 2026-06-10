@@ -137,11 +137,12 @@ def get_used_for_direction(direction):
         for p in positions:
             size = float(p.get("size", 0))
             avg_price = float(p.get("avgPrice", 0) or 0)
+            leverage = float(p.get("leverage", 1) or 1)
             status = p.get("positionStatus", "")
             side = p.get("side", "")
-            if size > 0 and avg_price > 0 and status == "Normal" and side == bybit_side:
-                total += size * avg_price
-        log.info(f"{direction} toplam kullanılan: {total:.2f}")
+            if size > 0 and avg_price > 0 and status == "Normal" and side == bybit_side and leverage > 0:
+                total += (size * avg_price) / leverage  # marjin
+        log.info(f"{direction} toplam kullanılan marjin: {total:.2f}")
         return total
     except Exception as e:
         log.error(f"Kullanım sorgu hatası ({direction}): {e}")
@@ -157,9 +158,10 @@ def get_coin_used(client, symbol, direction):
         for p in positions:
             size = float(p.get("size", 0))
             avg_price = float(p.get("avgPrice", 0) or 0)
-            if size > 0 and avg_price > 0 and p.get("side") == bybit_side:
-                total += size * avg_price
-        log.info(f"{symbol} {direction} coin kullanılan: {total:.2f}")
+            leverage = float(p.get("leverage", 1) or 1)
+            if size > 0 and avg_price > 0 and p.get("side") == bybit_side and leverage > 0:
+                total += (size * avg_price) / leverage  # marjin
+        log.info(f"{symbol} {direction} coin kullanılan marjin: {total:.2f}")
         return total
     except Exception as e:
         log.error(f"Coin kullanım sorgu hatası ({symbol}): {e}")
@@ -369,22 +371,21 @@ def process_signals(signals):
 
         client = client_long if direction == "Long" else client_short
 
-        # amount = marjin, gerçek pozisyon büyüklüğü = amount × leverage
-        position_value = amount * leverage
+        # amount = marjin (yatırılan para). Limit kontrolü marjin bazlı.
+        # Bybit'e gönderilen value = amount × leverage (qty hesabında)
 
-        # Toplam limit kontrolü — yön bazlı brüt, netleştirme yok
-        # total_amount = toplam pozisyon büyüklüğü limiti (value)
+        # Toplam limit kontrolü — marjin bazlı
         total_used = get_used_for_direction(direction)
-        if total_used + position_value > total_amount:
-            reason = f"Toplam limit aşılır ({direction} value {total_used:.0f}+{position_value:.0f} > {total_amount})"
+        if total_used + amount > total_amount:
+            reason = f"Toplam limit aşılır ({direction} marjin {total_used:.0f}+{amount} > {total_amount})"
             log.info(f"{symbol} atlandı: {reason}")
             skipped.append({**sig, "reason": reason})
             continue
 
-        # Coin bazlı limit kontrolü — coin_amount = toplam pozisyon büyüklüğü (value)
+        # Coin bazlı limit kontrolü — marjin bazlı
         coin_used = get_coin_used(client, symbol, direction)
-        if coin_used + position_value > coin_amount:
-            reason = f"Coin limiti aşılır ({symbol} {direction} value {coin_used:.0f}+{position_value:.0f} > {coin_amount})"
+        if coin_used + amount > coin_amount:
+            reason = f"Coin limiti aşılır ({symbol} {direction} marjin {coin_used:.0f}+{amount} > {coin_amount})"
             log.info(f"{symbol} atlandı: {reason}")
             skipped.append({**sig, "reason": reason})
             continue
